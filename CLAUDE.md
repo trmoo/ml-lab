@@ -58,7 +58,22 @@ PYTHONUTF8=1 python tools/local/originality.py   # 원본 대조 (로컬 전용)
 - `grep -c 티쳐무 dist/index.html` 이 3 이상이어야 한다(vite.config.js · 워크플로가 검사).
 
 ## 현재 개발 상태 (2026-09-19)
-- 탭 5개와 문제 은행 96문제 완성. `npm test`·`npm run verify`·원본 대조 모두 통과, 빌드 성공.
+- 탭 5개와 문제 은행 96문제 완성. `npm test`·`npm run verify`·원본 대조 모두 통과.
 - 문제는 exam 회차를 먼저 직접 써서 본보기로 삼고, 나머지 9회차를 서브에이전트 5개(Sonnet 5)가 규칙 문서만 보고 썼다.
-- **아직 할 일** — 브라우저에서 문제 풀기 탭 네 가지 모양을 직접 눌러 보기 · `sweep` 전수 점검 ·
-  깃 저장소 만들기(공개) · Pages 켜기(**빈 저장소를 만들 때 Settings → Pages → Source 를 「GitHub Actions」 로 먼저**).
+- 배포된 화면에서 네 가지 문제 모양의 채점(맞음·틀림), 96문제 전부 그리기·해설 열기,
+  「실험실에서 직접 해 보기」가 같은 데이터로 탭을 여는 것까지 확인했다. 콘솔 오류 0건.
+
+## 저장소 · 배포 (2026-09-19)
+- 저장소: https://github.com/trmoo/ml-lab (공개) · Pages: https://trmoo.github.io/ml-lab/
+- 포털 `comedu_portal` 의 「[인공지능] 학습 자료」에 🧪 머신러닝 실험실로 올렸다.
+- Pages 는 처음부터 「GitHub Actions」(`build_type: workflow`)라 Jekyll 잡이 생기지 않았다.
+- 워크플로: `npm ci → npm test → 파이썬 정답 점검(pip pandas scikit-learn) → sweep → build → 점검 → 배포`.
+- ⚠⚠ **첫 푸시에서 파이썬 정답 점검이 깨졌다** — 로지스틱 회귀에 **표준화 없이** 원(₩) 단위 컬럼을 넣었더니
+  최적화가 불안정해 깃허브 서버와 이 PC 의 숫자가 달랐다(churn-09 · quality-08/09).
+  학생의 코랩에서도 똑같이 어긋날 수 있다. `make_pipeline(StandardScaler(), LogisticRegression(…))` 로 바꾸고
+  solver 넷(lbfgs·newton-cg·newton-cholesky·saga)에서 같은 값이 나오는 것을 확인했다.
+  **새 문제에 로지스틱 회귀·신경망처럼 반복 최적화하는 모델을 쓰면 반드시 표준화할 것.**
+- ⚠ **임계값 문제는 확률이 임계값에 붙어 있지 않은지 볼 것** — 0.3 은 확률 하나가 0.0045 차이라 0.2(여유 0.034)로 바꿨고,
+  `check` 에 `float(abs(proba - 0.2).min()) > 0.01` 을 넣어 지킨다. AUC 처럼 셋째 자리에서 갈리는 값은 둘째 자리로 비교한다.
+- 배포본이 로컬 `dist/index.html` 보다 약 32KB 작다 — 로컬 CSV 가 CRLF 라서다(깃이 LF 로 올림). 내용은 같다.
+- 확인: `curl -s https://trmoo.github.io/ml-lab/ | wc -c` 가 약 1,051,000 이면 정상(1KB 미만이면 브랜치 배포가 이긴 것).
