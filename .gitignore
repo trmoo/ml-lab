@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# 로컬 전용 도구 (원본 대조 검사 등) — 저장소에 올리지 않는다
+tools/local/
+
+# 파이썬 캐시
+__pycache__/
+*.pyc

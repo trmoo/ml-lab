@@ -1,0 +1,243 @@
+{
+  "goal": "치우친 목표(손해·이익이 섞인 성과율)를 다루고, 노출→클릭→가입으로 이어지는 사슬의 다중공선성과 규제(릿지·라쏘)를 익힌다.",
+  "setup": "import pandas as pd\npromo_df = pd.read_csv('ad_return.csv')",
+  "problems": [
+    {
+      "id": "ad-01",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "성과율, 손해도 있을까",
+      "prompt": "광고 캠페인의 성과율(`return_rate_percent`)은 들인 돈 대비 번 돈의 비율입니다. 손해를 본 캠페인이 얼마나 되는지 알아보려 합니다. 아래 코드의 실행 결과로 알맞은 것을 고르세요.",
+      "code": "(promo_df['return_rate_percent'] < 0).sum()",
+      "choices": [
+        "0",
+        "119",
+        "239",
+        "480"
+      ],
+      "answer": 2,
+      "check": [
+        "(promo_df['return_rate_percent'] < 0).sum() == 239"
+      ],
+      "hint": "480개 캠페인 중 몇 개가 마이너스(-) 값을 가지는지 세어 보세요.",
+      "explain": "성과율이 0보다 작은 캠페인이 **239개(거의 절반)** 입니다. 이 목표값은 손해(음수)와 이익(양수)이 함께 섞여 있다는 뜻입니다. 이런 목표는 로그 변환처럼 값이 양수라고 가정하는 방법을 그대로 쓸 수 없습니다(음수의 로그는 정의되지 않습니다). 회귀 모델 자체는 음수 목표도 문제없이 다루지만, 전처리 방법을 고를 때는 이 사실을 기억해야 합니다."
+    },
+    {
+      "id": "ad-02",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "매체별 평균과 중앙값 비교",
+      "prompt": "매체마다 성과율의 **평균**과 **중앙값**을 나란히 계산했습니다. 결과를 보고 가장 알맞게 설명한 것을 고르세요.",
+      "code": "print(promo_df.groupby('media')['return_rate_percent'].mean().round(2))\nprint(promo_df.groupby('media')['return_rate_percent'].median().round(2))",
+      "choices": [
+        "라디오는 평균이 중앙값보다 낮다",
+        "네 매체 모두 평균이 중앙값보다 높다 — 성과가 아주 좋은 소수 캠페인이 평균을 끌어올렸다는 뜻이다",
+        "검색은 평균과 중앙값이 같다",
+        "평균과 중앙값의 차이는 이상치와 관련이 없다"
+      ],
+      "answer": 1,
+      "check": [
+        "round(promo_df.groupby('media')['return_rate_percent'].mean()['검색'], 2) == 57.61",
+        "round(promo_df.groupby('media')['return_rate_percent'].median()['검색'], 2) == 46.12",
+        "(promo_df.groupby('media')['return_rate_percent'].mean() > promo_df.groupby('media')['return_rate_percent'].median()).all()"
+      ],
+      "explain": "네 매체 모두 평균이 중앙값보다 높습니다(검색 57.61 vs 46.12, 라디오 −24.82 vs −32.31 등). 성과율의 최댓값이 290.84%로 아주 크게 튀는 캠페인이 있어, 이런 소수의 대박 캠페인이 평균을 위로 끌어올립니다. 중앙값은 이런 극단값에 덜 흔들리므로, 매체의 '보통 성과'를 보려면 평균보다 중앙값이 더 믿을 만합니다.",
+      "lab": {
+        "tab": "explore",
+        "say": "데이터 탐험실의 groupby 집계기에서 media 별로 평균과 중앙값을 함께 비교해 보자."
+      }
+    },
+    {
+      "id": "ad-03",
+      "type": "blank",
+      "stage": "결측치",
+      "title": "광고비·기간의 빈 칸 채우기",
+      "prompt": "`budget_manwon`(광고비)과 `run_days`(기간)에 결측치가 있습니다. 두 컬럼 모두 **중앙값**으로 채우세요.",
+      "code": "promo_df['budget_manwon'] = promo_df['budget_manwon'].fillna(promo_df['budget_manwon'].⟦median⟧())\npromo_df['run_days'] = promo_df['run_days'].fillna(promo_df['run_days'].median())\nprint(promo_df.isna().sum().sum())",
+      "blanks": [
+        {
+          "options": [
+            "mean",
+            "mode",
+            "max"
+          ]
+        }
+      ],
+      "check": [
+        "int(promo_df.isna().sum().sum()) == 0",
+        "promo_df['budget_manwon'].median() == 10115.0",
+        "promo_df['run_days'].median() == 51.5"
+      ],
+      "explain": "`median()`은 값을 크기 순으로 세웠을 때 가운데 값입니다. 광고비·기간은 캠페인마다 들쭉날쭉하지만 이 데이터의 목표값(성과율)만큼 극단적이지는 않아 평균을 써도 크게 다르지 않지만, 값이 크게 튈 수 있는 데이터를 다룰 때는 평균보다 중앙값을 기본으로 쓰는 습관을 들이면 안전합니다.",
+      "lab": {
+        "tab": "prep",
+        "say": "전처리 실험실에서 결측치를 평균·중앙값으로 채울 때 분포가 어떻게 달라지는지 비교해 보자."
+      }
+    },
+    {
+      "id": "ad-04",
+      "type": "blank",
+      "stage": "파생변수",
+      "title": "클릭률 파생변수 만들기",
+      "prompt": "노출 수(`views`) 대비 클릭 수(`click_count`)의 비율인 **클릭률**을 새 컬럼으로 만들고, 성과율과의 상관을 확인하세요.",
+      "code": "promo_df['click_rate'] = promo_df['click_count'] ⟦/⟧ promo_df['views']\nprint(round(promo_df['click_rate'].corr(promo_df['return_rate_percent']), 2))",
+      "blanks": [
+        {
+          "options": [
+            "*",
+            "//",
+            "%"
+          ]
+        }
+      ],
+      "check": [
+        "round(promo_df['click_rate'].corr(promo_df['return_rate_percent']), 2) == 0.64",
+        "round(promo_df['click_rate'].corr(promo_df['views']), 2) == 0.14"
+      ],
+      "explain": "클릭률은 노출 수와 상관없이 '얼마나 잘 전환되는가'를 나타냅니다. `views` 하나만 볼 때는 성과율과 상관이 0.30 밖에 안 되지만, 클릭률로 바꾸면 상관이 0.64까지 올라갑니다. 원래 값보다 비율로 만든 파생변수가 더 쓸모 있는 정보를 담을 때가 많습니다."
+    },
+    {
+      "id": "ad-05",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "노출→클릭→가입, 사슬처럼 얽힌 변수",
+      "prompt": "`views`(노출)→`click_count`(클릭)→`signup_count`(가입)는 순서대로 좁아지는 깔때기입니다. 세 컬럼의 상관계수를 보고 옳게 설명한 것을 고르세요.",
+      "code": "promo_df[['views', 'click_count', 'signup_count']].corr().round(3)",
+      "choices": [
+        "세 값의 상관이 모두 0.5 미만이다",
+        "노출과 가입의 상관(0.83)이 셋 중 가장 강하다",
+        "노출-클릭(0.91)과 클릭-가입(0.90)의 상관이 노출-가입(0.83)보다 강하다 — 사슬에서 바로 이웃한 값일수록 더 강하게 붙어 있다",
+        "노출, 클릭, 가입은 서로 거의 관계가 없다"
+      ],
+      "answer": 2,
+      "check": [
+        "round(promo_df[['views','click_count']].corr().iloc[0,1], 2) == 0.91",
+        "round(promo_df[['click_count','signup_count']].corr().iloc[0,1], 2) == 0.90",
+        "round(promo_df[['views','signup_count']].corr().iloc[0,1], 2) == 0.83"
+      ],
+      "explain": "노출-클릭 0.91, 클릭-가입 0.90, 노출-가입 0.83입니다. 사슬에서 바로 이웃한 단계일수록 상관이 강하고, 두 단계 건너뛴 노출-가입은 상대적으로 약합니다. 이렇게 서로 강하게 얽힌 변수들을 한 회귀 모델에 그대로 넣으면 각 변수의 계수를 따로 해석하기 어려워지는 **다중공선성** 문제가 생깁니다.",
+      "lab": {
+        "tab": "explore",
+        "say": "데이터 탐험실의 상관계수 히트맵에서 노출·클릭·가입 세 칸이 얼마나 진하게 이어지는지 확인해 보자."
+      }
+    },
+    {
+      "id": "ad-06",
+      "type": "blank",
+      "stage": "인코딩",
+      "title": "매체·나이대를 원-핫으로",
+      "prompt": "`media`(매체)와 `age_group`(나이대)는 순서가 없는 범주입니다. 두 컬럼을 원-핫 인코딩해 `promo_pre`를 만드세요.",
+      "code": "promo_pre = pd.get_dummies(promo_df, columns=⟦['media', 'age_group']⟧, dtype=int)\nprint(promo_pre.shape)",
+      "blanks": [
+        {
+          "options": [
+            "['media']",
+            "['age_group']",
+            "['media', 'age_group', 'run_days']"
+          ]
+        }
+      ],
+      "check": [
+        "promo_pre.shape == (480, 15)",
+        "'media' not in promo_pre.columns",
+        "'age_group' not in promo_pre.columns",
+        "'media_검색' in promo_pre.columns"
+      ],
+      "explain": "이 시점의 `promo_df`는 원래 8개 컬럼에 클릭률(`click_rate`)을 더해 9개 컬럼입니다. `media`와 `age_group`은 크고 작음이 없는 범주라서 숫자 하나로 바꾸면 모델이 순서가 있다고 착각합니다. `get_dummies()`로 각 범주(4종류씩)마다 0/1 컬럼을 만들면, 두 컬럼이 4개씩의 컬럼으로 늘어나 전체가 15열이 됩니다. `run_days`처럼 이미 숫자인 컬럼까지 원-핫으로 바꾸면 의미 없이 컬럼 수만 늘어납니다."
+    },
+    {
+      "id": "ad-07",
+      "type": "blank",
+      "stage": "분리·스케일링",
+      "title": "훈련 데이터로만 스케일러 학습",
+      "prompt": "이 데이터는 480행뿐입니다. 검증용으로 25%를 떼어 둔 다음, 값의 크기를 맞추는 스케일러를 준비하세요. 스케일러가 **기준을 배우는 곳은 훈련 쪽 한 군데**여야 합니다.",
+      "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.preprocessing import StandardScaler\n\nX = promo_pre.drop(columns=['return_rate_percent'])\ny = promo_pre['return_rate_percent']\nX_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=17)\n\nscaler = StandardScaler()\nX_train_s = scaler.⟦fit_transform⟧(X_train)\nX_valid_s = scaler.⟦transform⟧(X_valid)",
+      "blanks": [
+        {
+          "options": [
+            "transform",
+            "fit",
+            "predict"
+          ]
+        },
+        {
+          "options": [
+            "fit_transform",
+            "fit",
+            "predict"
+          ]
+        }
+      ],
+      "check": [
+        "len(X_train) == 360",
+        "len(X_valid) == 120",
+        "abs(X_train_s.mean()) < 1e-6",
+        "X_valid_s.shape == (120, 14)"
+      ],
+      "explain": "표준화 스케일러는 「평균을 빼고 표준편차로 나눈다」는 규칙을 씁니다. 이 평균과 표준편차를 어디서 구하느냐가 핵심입니다. 훈련 쪽에서는 `fit_transform` 으로 기준을 구하면서 바로 바꾸고, 검증 쪽에는 이미 구한 기준을 `transform` 으로 덮어씌우기만 합니다. 검증 쪽에서 기준을 새로 구하면 모델이 원래 몰라야 할 검증 자료의 모습을 미리 엿본 셈이 되어, 실제보다 좋은 점수가 나올 수 있습니다. 480행은 작은 편이라 검증 몫을 120행으로 넉넉히 잡아야 우연에 덜 흔들립니다."
+    },
+    {
+      "id": "ad-08",
+      "type": "bug",
+      "stage": "모델 학습",
+      "title": "라쏘인데 계수가 통째로 사라졌다",
+      "prompt": "라쏘 회귀로 `click_rate`의 계수를 확인했더니 0이 나왔습니다. `click_rate`는 성과율과 상관이 0.64로 꽤 강한데 이상합니다. 잘못된 줄을 찾으세요.",
+      "code": "from sklearn.linear_model import Lasso\nlasso = Lasso(alpha=1.0)\nlasso.fit(X_train, y_train)\ncoef = dict(zip(X_train.columns, lasso.coef_))\nprint(round(coef['click_rate'], 2))",
+      "answer": 3,
+      "fix": "lasso.fit(X_train_s, y_train)",
+      "check": [
+        "coef['click_rate'] > 0",
+        "round(coef['click_rate'], 2) == 19.23",
+        "round(coef['signup_count'], 0) == 53"
+      ],
+      "hint": "budget_manwon은 수천~수만 단위인데 click_rate는 0.01 수준입니다. 스케일이 다른 값을 그대로 넣으면 규제가 공평하게 걸리지 않습니다.",
+      "explain": "스케일링을 하지 않은 `X_train`을 그대로 넣으면, 라쏘의 규제(alpha)가 **모든 컬럼에 절댓값 크기로 똑같이** 걸립니다. `budget_manwon`(수천~수만)처럼 값이 큰 컬럼은 규제를 견디지만, `click_rate`(0.007~0.042)처럼 원래 값이 아주 작은 컬럼은 계수가 통째로 0으로 눌려 사라집니다. `X_train_s`(스케일링한 데이터)로 학습해야 값의 크기가 아니라 **실제로 얼마나 중요한지**에 따라 규제가 걸립니다."
+    },
+    {
+      "id": "ad-09",
+      "type": "choice",
+      "stage": "평가",
+      "title": "규제가 항상 도움이 될까",
+      "prompt": "선형 회귀, 릿지(alpha=10), 라쏘(alpha=1.0)를 같은 스케일링 데이터로 학습해 검증 점수(R²)를 비교했습니다. 결과를 보고 옳은 설명을 고르세요.",
+      "code": "from sklearn.linear_model import LinearRegression, Ridge\n\nridge = Ridge(alpha=10.0).fit(X_train_s, y_train)\nlin = LinearRegression().fit(X_train_s, y_train)\nprint('선형 회귀', round(lin.score(X_valid_s, y_valid), 3))\nprint('릿지', round(ridge.score(X_valid_s, y_valid), 3))\nprint('라쏘', round(lasso.score(X_valid_s, y_valid), 3))",
+      "choices": [
+        "라쏘가 세 모델 중 검증 점수가 가장 높다",
+        "규제를 걸지 않은 선형 회귀의 검증 점수가 가장 높다 — 이 데이터는 과대적합이 심하지 않아 규제가 오히려 점수를 살짝 깎았다",
+        "릿지와 라쏘의 검증 점수는 정확히 같다",
+        "세 모델의 검증 점수 차이가 0.1 이상 난다"
+      ],
+      "answer": 1,
+      "check": [
+        "round(lin.score(X_valid_s, y_valid), 3) == 0.76",
+        "round(ridge.score(X_valid_s, y_valid), 3) == 0.745",
+        "round(lasso.score(X_valid_s, y_valid), 3) == 0.727",
+        "round(lin.score(X_train_s, y_train), 3) == 0.778"
+      ],
+      "explain": "검증 점수는 선형 회귀 0.760 > 릿지 0.745 > 라쏘 0.727 순입니다. 규제는 훈련 데이터에 지나치게 맞춰진(과대적합) 모델을 억제할 때 도움이 됩니다. 이 모델은 훈련 점수(0.778)와 검증 점수(0.760)의 차이가 크지 않아 과대적합이 심하지 않았고, 그래서 규제가 오히려 정보를 조금 깎아내 점수를 낮췄습니다. 규제는 만능이 아니라 **과대적합을 의심할 때 시도하는 도구**입니다.",
+      "lab": {
+        "tab": "train",
+        "say": "모델 학습실에서 라쏘의 alpha 슬라이더를 올리며 계수가 하나씩 0이 되는 걸 지켜보자."
+      }
+    },
+    {
+      "id": "ad-10",
+      "type": "choice",
+      "stage": "해석·예측",
+      "title": "가장 힘이 센 변수는",
+      "prompt": "스케일링한 데이터로 학습한 선형 회귀 모델의 계수를 절댓값 기준으로 정렬했습니다. 성과율에 가장 큰 영향을 준 변수는 무엇일까요?",
+      "code": "coef_lin = pd.Series(lin.coef_, index=X_train.columns).round(2)\nprint(coef_lin.abs().sort_values(ascending=False).head(5))",
+      "choices": [
+        "signup_count",
+        "budget_manwon",
+        "click_count",
+        "media_검색"
+      ],
+      "answer": 0,
+      "check": [
+        "coef_lin.abs().idxmax() == 'signup_count'",
+        "round(coef_lin['signup_count'], 1) == 62.1"
+      ],
+      "explain": "계수가 가장 큰 컬럼은 **가입 수(signup_count)**입니다(약 62.1). 노출·클릭·가입이 서로 얽혀 있어도(다중공선성), 성과율과 가장 직접 이어진 것은 결국 실제로 가입까지 이어진 수입니다. 노출이나 클릭만 늘리고 가입으로 이어지지 않으면 성과율은 오르지 않는다는 뜻이기도 합니다."
+    }
+  ]
+}

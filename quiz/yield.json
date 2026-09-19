@@ -1,0 +1,168 @@
+{
+  "goal": "상관관계가 모두 약한 데이터에서 좋은 모델을 써도 잘 맞힐 수 없는 경우를 겪어 보고, 기준 모델·교차검증으로 「신호가 없다」는 것을 확인하는 법을 배운다.",
+  "setup": "import pandas as pd\nproc_df = pd.read_csv('process_yield.csv')",
+  "problems": [
+    {
+      "id": "yield-01",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "그나마 가장 이어진 변수 찾기",
+      "prompt": "이 회차는 센서값이 많지만, 목표(`good_rate_percent`)와 강하게 이어진 변수가 거의 없습니다. 상관계수를 구해 그나마 가장 강하게 이어진 변수를 찾으세요.",
+      "code": "corr = proc_df.corr(numeric_only=True)['good_rate_percent']\nprint(corr.sort_values())",
+      "choices": ["worker_years", "chamber_temp", "power_kw", "cycle_time_sec"],
+      "answer": 0,
+      "check": [
+        "round(corr['worker_years'], 2) == 0.29",
+        "corr.drop('good_rate_percent').abs().idxmax() == 'worker_years'"
+      ],
+      "hint": "나머지 센서값들의 상관계수는 0에 아주 가깝습니다.",
+      "explain": "`worker_years`(작업자 경력)의 상관계수가 약 0.29로 그나마 가장 크고, 나머지 센서값은 모두 0에 아주 가깝습니다. 0.29도 「강하다」고 부르기는 어려운 수준입니다. 이 회차의 데이터는 처음부터 이렇게 설계되었습니다 — 좋은 모델을 쓰기 전에, 애초에 예측할 실마리가 데이터 안에 얼마나 있는지부터 확인하는 습관이 필요합니다."
+    },
+    {
+      "id": "yield-02",
+      "type": "blank",
+      "stage": "결측치",
+      "title": "네 컬럼의 빈칸을 중앙값으로",
+      "prompt": "결측치가 있는 네 컬럼(`chamber_temp`·`chamber_pressure`·`chamber_humidity`·`cycle_time_sec`)을 각 컬럼의 **중앙값**으로 채우세요.",
+      "code": "proc_pre = proc_df.copy()\nfor col in ['chamber_temp', 'chamber_pressure', 'chamber_humidity', 'cycle_time_sec']:\n    proc_pre[col] = proc_pre[col].⟦fillna⟧(proc_pre[col].⟦median⟧())",
+      "blanks": [
+        {"options": ["dropna", "interpolate", "bfill"]},
+        {"options": ["mean", "mode", "max"]}
+      ],
+      "check": [
+        "int(proc_pre.isna().sum().sum()) == 0",
+        "proc_pre.shape == (1920, 10)"
+      ],
+      "explain": "`fillna()` 는 빈칸을 정해진 값으로 채웁니다. 이 회차는 애초에 목표를 잘 설명하는 컬럼이 없으므로, 결측치를 어떤 방법으로 채우든(평균이든 중앙값이든) 예측력이 크게 달라지지는 않습니다. 그래도 데이터를 다루는 순서는 다른 회차와 똑같이 지킵니다 — 신호가 약한 데이터라고 전처리를 건너뛰는 것은 아닙니다.",
+      "lab": {"tab": "explore", "say": "데이터 탐험실의 상관 히트맵에서 6회차 데이터를 열어 보자. 진하게 칠해진 칸이 거의 없다는 것을 눈으로 확인할 수 있다."}
+    },
+    {
+      "id": "yield-03",
+      "type": "blank",
+      "stage": "분리·스케일링",
+      "title": "기준이 될 「평균만 찍는」 모델",
+      "prompt": "범주형 컬럼을 원-핫 인코딩하고 훈련·검증으로 나눈 뒤, 앞으로 만들 모델과 비교할 **기준 모델**을 만드세요. 기준 모델은 무엇을 넣든 **훈련 데이터의 평균값**만 그대로 내놓습니다.",
+      "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.dummy import DummyRegressor\n\nproc_pre = pd.get_dummies(proc_pre, columns=['line_code', 'material_grade'], dtype=int)\nX = proc_pre.drop(columns=['good_rate_percent'])\ny = proc_pre['good_rate_percent']\nX_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=42)\n\nbaseline = DummyRegressor(strategy=⟦'mean'⟧)\nbaseline.⟦fit⟧(X_train, y_train)",
+      "blanks": [
+        {"options": ["'median'", "'most_frequent'", "'constant'"]},
+        {"options": ["predict", "transform", "score"]}
+      ],
+      "check": [
+        "proc_pre.shape == (1920, 13)",
+        "len(X_train) == 1440",
+        "len(X_valid) == 480",
+        "round(baseline.predict(X_valid)[0], 2) == round(y_train.mean(), 2)"
+      ],
+      "hint": "`DummyRegressor` 는 진짜로 학습하지 않고, 정한 전략(`strategy`)대로만 값을 내놓습니다.",
+      "explain": "`DummyRegressor(strategy='mean')` 은 입력을 전혀 보지 않고 **훈련 데이터의 평균값**만 되풀이해서 내놓습니다. 이런 「아무것도 안 배운」 모델의 점수를 미리 알아 두면, 진짜 모델이 그보다 나은지 아닌지를 비교할 기준(바닥선)이 생깁니다. 상관관계가 모두 약한 이 데이터에서는 이 바닥선을 넘기가 얼마나 어려운지 다음 문제에서 확인합니다."
+    },
+    {
+      "id": "yield-04",
+      "type": "choice",
+      "stage": "평가",
+      "title": "기준 모델의 R² 읽기",
+      "prompt": "기준 모델(`baseline`)의 검증 R² 를 구했습니다. 이 값을 바르게 해석한 것을 고르세요.",
+      "code": "from sklearn.metrics import r2_score\npred = baseline.predict(X_valid)\nprint(round(r2_score(y_valid, pred), 3))",
+      "choices": [
+        "1.0 — 완벽하게 맞혔다",
+        "0.5 — 절반쯤 맞혔다",
+        "0에 아주 가깝다 — 평균만 찍은 것과 다름없다는 뜻이다",
+        "음수로 크게 떨어진다 — 기준 모델조차 망가졌다"
+      ],
+      "answer": 2,
+      "check": ["abs(r2_score(y_valid, pred)) < 0.01"],
+      "explain": "평균만 찍는 모델의 R² 는 정의상 0에 가깝습니다(훈련 데이터에서는 정확히 0, 검증 데이터에서는 거의 0). 이 값이 바로 「아무것도 배우지 않았을 때」의 점수입니다. 앞으로 만들 진짜 모델의 점수가 이 값과 별 차이가 없다면, 모델이 잘못 만들어진 것이 아니라 **데이터 자체에 배울 거리가 부족하다**는 뜻으로 읽어야 합니다."
+    },
+    {
+      "id": "yield-05",
+      "type": "blank",
+      "stage": "모델 학습",
+      "title": "선형 회귀도 훈련 점수부터 낮다",
+      "prompt": "선형 회귀를 학습시키고 훈련·검증 점수를 나란히 확인하세요.",
+      "code": "from sklearn.linear_model import LinearRegression\n\nmodel = LinearRegression()\nmodel.fit(X_train, y_train)\ntrain_r2 = model.⟦score⟧(X_train, y_train)\nvalid_r2 = model.score(X_valid, y_valid)\nprint(round(train_r2, 3), round(valid_r2, 3))",
+      "blanks": [
+        {"options": ["predict", "fit", "transform"]}
+      ],
+      "check": [
+        "round(train_r2, 2) == 0.15",
+        "round(valid_r2, 2) == 0.08",
+        "train_r2 - valid_r2 < 0.1"
+      ],
+      "hint": "`score()` 는 이미 학습된 모델에 R² 를 물어볼 때 씁니다.",
+      "explain": "훈련 점수(0.15)와 검증 점수(0.08) 모두 낮고, 둘의 차이도 크지 않습니다. 과적합이라면 보통 훈련 점수는 높은데 검증 점수만 뚝 떨어지는 모습이 나옵니다. 여기서는 **모델이 훈련 데이터조차 잘 설명하지 못합니다** — 모델을 더 복잡하게 만들어서 해결될 문제가 아니라, 애초에 입력 변수들이 목표를 설명할 만한 관계를 갖고 있지 않다는 뜻입니다.",
+      "lab": {"tab": "train", "say": "모델 학습실에서 6회차 데이터로 선형 회귀를 학습해, 훈련·검증 점수가 둘 다 낮게 나오는 것을 직접 확인해 보자."}
+    },
+    {
+      "id": "yield-06",
+      "type": "bug",
+      "stage": "모델 학습",
+      "title": "「검증 점수」라 적었지만",
+      "prompt": "랜덤 포레스트라면 더 잘 맞힐 거라 기대하고 학습시켰습니다. 아래 코드는 `valid_r2` 라는 이름으로 점수를 출력하지만 실제로는 잘못된 값을 보여 주고 있습니다. 잘못된 줄을 찾으세요.",
+      "code": "from sklearn.ensemble import RandomForestRegressor\nrf = RandomForestRegressor(n_estimators=300, random_state=42)\nrf.fit(X_train, y_train)\nvalid_r2 = rf.score(X_train, y_train)\nprint(round(valid_r2, 3))",
+      "answer": 4,
+      "fix": "valid_r2 = rf.score(X_valid, y_valid)",
+      "sandbox": true,
+      "check": [
+        "round(valid_r2, 2) == 0.07",
+        "round(rf.score(X_train, y_train), 2) == 0.87"
+      ],
+      "hint": "변수 이름은 '검증'인데, 점수를 구할 때 넣은 데이터를 다시 보세요.",
+      "explain": "4번 줄은 `X_valid, y_valid` 가 아니라 `X_train, y_train` 으로 점수를 구했습니다. 그래서 실제로는 **훈련 점수(0.87)** 를 「검증 점수」라고 잘못 보여 줍니다. 훈련 점수만 보면 랜덤 포레스트가 아주 잘 맞히는 것처럼 보이지만, 제대로 `X_valid, y_valid` 로 구한 진짜 검증 점수는 0.07 로 선형 회귀(0.08)보다 나을 것도 없습니다. **복잡한 모델은 훈련 데이터를 더 잘 외울 뿐, 데이터에 없던 신호를 만들어 내지는 못합니다.**"
+    },
+    {
+      "id": "yield-07",
+      "type": "blank",
+      "stage": "평가",
+      "title": "다섯 번 나눠도 똑같이 낮다면",
+      "prompt": "혹시 하필 운 나쁘게 나눈 탓은 아닌지 확인하려고 합니다. 데이터를 다섯 번 다르게 나누어 선형 회귀의 R² 를 각각 구하세요.",
+      "code": "from sklearn.model_selection import cross_val_score\n\nscores = cross_val_score(LinearRegression(), X, y, cv=⟦5⟧, scoring=⟦'r2'⟧)\nprint(scores.round(3))",
+      "blanks": [
+        {"options": ["3", "10", "1"]},
+        {"options": ["'neg_mean_squared_error'", "'accuracy'", "'f1'"]}
+      ],
+      "check": [
+        "len(scores) == 5",
+        "round(scores.mean(), 2) == 0.12",
+        "scores.min() > 0"
+      ],
+      "hint": "회귀 문제에는 정확도(accuracy)를 쓸 수 없습니다 — 그건 분류에서 씁니다.",
+      "explain": "다섯 번을 서로 다르게 나눠도 R² 는 매번 0.08~0.15 사이의 낮은 값에 머무릅니다. 어쩌다 한 번 나쁜 점수가 나온 것이 아니라 **어떻게 나눠도 비슷하게 낮다**는 뜻이고, 이것이 「운이 나빴다」가 아니라 「데이터에 신호가 부족하다」는 결론을 뒷받침하는 가장 확실한 증거입니다."
+    },
+    {
+      "id": "yield-08",
+      "type": "order",
+      "stage": "평가",
+      "title": "점수가 낮을 때 확인하는 차례",
+      "prompt": "모델의 검증 점수가 낮게 나왔을 때, 「모델이 잘못됐다」고 바로 단정하기 전에 확인해야 할 것들이 있습니다. 아래 단계를 **올바른 차례**로 늘어놓으세요.",
+      "steps": [
+        "상관계수로 각 변수가 목표와 얼마나 이어져 있는지 살펴본다",
+        "평균만 찍는 기준 모델과 점수를 비교한다",
+        "더 복잡한 모델을 시도해 점수가 오르는지 확인한다",
+        "교차검증으로 점수가 여러 번에 걸쳐 낮게 나오는지 확인한다",
+        "데이터에 신호가 부족하다고 결론짓는다"
+      ],
+      "explain": "상관관계부터 훑어 큰 그림을 잡고, 기준 모델로 「아무것도 안 배운 점수」를 알아 둔 뒤, 더 복잡한 모델로 정말 모델의 한계인지 확인하고, 마지막으로 교차검증으로 우연이 아님을 확인합니다. 이 순서를 건너뛰고 모델만 계속 바꾸면, 애초에 손댈 수 없는 데이터를 붙잡고 시간을 허비하게 됩니다."
+    },
+    {
+      "id": "yield-09",
+      "type": "choice",
+      "stage": "평가",
+      "title": "MAE 가 작아 보이는 진짜 이유",
+      "prompt": "선형 회귀와 기준 모델의 MAE(평균 절대 오차)를 나란히 구했습니다. 결과를 바르게 해석한 것을 고르세요.",
+      "code": "from sklearn.metrics import mean_absolute_error\nmodel_mae = mean_absolute_error(y_valid, model.predict(X_valid))\nbase_mae = mean_absolute_error(y_valid, baseline.predict(X_valid))\nprint(round(model_mae, 2), round(base_mae, 2))",
+      "choices": [
+        "선형 회귀가 기준 모델보다 훨씬 낫다 — MAE 가 절반 이하로 줄었다",
+        "MAE 가 1보다 작으므로 이 모델은 실전에 바로 써도 된다",
+        "두 MAE 가 거의 같다 — good_rate_percent 자체가 91~97 사이 좁은 범위에 모여 있어, 아무렇게나 찍어도 오차가 크게 나지 않기 때문이다",
+        "MAE 가 작을수록 R² 도 항상 높아진다"
+      ],
+      "answer": 2,
+      "check": [
+        "round(model_mae, 2) == 0.82",
+        "round(base_mae, 2) == 0.84",
+        "abs(model_mae - base_mae) < 0.05"
+      ],
+      "explain": "선형 회귀의 MAE(0.82)와 기준 모델의 MAE(0.84)는 거의 차이가 없습니다. `good_rate_percent` 값 자체가 91~97 사이의 좁은 범위에 몰려 있어서, 평균만 찍어도 웬만해서는 크게 틀리지 않기 때문입니다. **MAE 가 작아 보인다고 모델이 뭔가를 잘 배웠다는 뜻은 아닙니다** — 목표값의 범위가 원래 좁을 때는 R² 나 기준 모델과의 비교처럼, 「얼마나 좁은 범위를 맞히는가」가 아니라 「기준선보다 얼마나 나은가」로 판단해야 합니다."
+    }
+  ]
+}
