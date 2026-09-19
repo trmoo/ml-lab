@@ -49,7 +49,7 @@ tools/local/           로컬 전용 (저장소에 없음) — originality.py
 ```bash
 npm install
 npm start              # 개발 서버 http://localhost:5187
-npm run build          # dist/index.html 한 파일 (약 856KB, 데이터·문제 포함)
+npm run build          # dist/index.html 한 파일 (약 1.08MB, 데이터·문제 포함 — vite 가 찍는 856kB 는 글자 수)
 npm test               # 계산 점검 81가지 + 문제 은행 모양 점검 102가지
 npm run verify         # 문제 96개를 파이썬으로 실행해 정답 확인
 node test/sweep.mjs    # 데이터 10종 × 모델 전수 학습
