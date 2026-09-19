@@ -1,0 +1,176 @@
+{
+  "goal": "강수량 · 흙 종류 · 파생변수가 수확량에 정말 영향을 주는지 상관·그룹별 평균·특성 중요도로 하나씩 확인한다.",
+  "setup": "import pandas as pd\nfarm_df = pd.read_csv('crop_output.csv')",
+  "problems": [
+    {
+      "id": "crop-01",
+      "type": "choice",
+      "stage": "시각화",
+      "title": "수확량과 가장 관련 깊은 변수",
+      "prompt": "숫자로 된 변수 일곱 개가 예측 목표 `output_kg_per_ha`(수확량) 와 얼마나 관련 있는지 상관계수로 살펴봅니다. 절댓값이 가장 큰 변수를 고르세요.",
+      "code": "num_cols = ['rain_mm_year', 'mean_temp', 'sun_hours', 'soil_ph', 'n_level', 'p_level', 'k_level']\nfarm_df[num_cols].corrwith(farm_df['output_kg_per_ha']).round(3)",
+      "choices": ["rain_mm_year (강수량)", "mean_temp (평균 기온)", "sun_hours (일조 시간)", "soil_ph (흙의 산도)"],
+      "answer": 0,
+      "check": [
+        "farm_df[['rain_mm_year','mean_temp','sun_hours','soil_ph','n_level','p_level','k_level']].corrwith(farm_df['output_kg_per_ha']).abs().idxmax() == 'rain_mm_year'",
+        "round(farm_df['rain_mm_year'].corr(farm_df['output_kg_per_ha']), 2) == 0.69"
+      ],
+      "hint": "`corrwith()` 는 표의 각 컬럼과 괄호 안 시리즈 사이의 상관계수를 한 번에 구합니다.",
+      "explain": "일곱 변수 중 `rain_mm_year`(강수량)의 상관계수가 0.69 로 가장 큽니다. 강수량이 늘수록 수확량도 함께 느는 경향이 뚜렷하다는 뜻입니다. 나머지 변수는 대부분 0에 가까워 수확량을 혼자서는 잘 설명하지 못합니다. 다음 문제에서 그중에서도 특히 약한 세 변수를 자세히 봅니다."
+    },
+    {
+      "id": "crop-02",
+      "type": "choice",
+      "stage": "시각화",
+      "title": "질소·인·칼리는 쓸모가 있을까",
+      "prompt": "흙 속 성분인 `n_level`(질소) · `p_level`(인) · `k_level`(칼리) 은 농사에서 중요하다고 알려져 있습니다. 이 데이터에서 수확량과 어떤 관계인지 확인하세요.",
+      "code": "farm_df[['n_level', 'p_level', 'k_level']].corrwith(farm_df['output_kg_per_ha']).round(3)",
+      "choices": [
+        "셋 다 수확량과 뚜렷한 상관이 있다",
+        "n_level 만 강한 상관이 있다",
+        "셋 다 상관이 0.04 언저리로 거의 없다",
+        "k_level 만 강한 음의 상관이 있다"
+      ],
+      "answer": 2,
+      "check": [
+        "farm_df[['n_level','p_level','k_level']].corrwith(farm_df['output_kg_per_ha']).abs().max() < 0.1"
+      ],
+      "explain": "세 변수 모두 상관계수가 0.04 안팎으로 거의 0입니다. 흙 성분이 중요하다는 일반 상식과 달리, **이 데이터에서는** 세 값이 수확량과 관계없이 따로 매겨진 값이기 때문입니다. 변수가 「그럴듯해 보인다」고 곧바로 모델에 넣지 말고, 실제 데이터에서 관계를 확인하는 습관이 중요합니다.",
+      "lab": {"tab": "explore", "say": "데이터 탐험실의 상관 히트맵에서 n_level·p_level·k_level 행이 다른 변수보다 훨씬 옅은 색인지 확인해 보자."}
+    },
+    {
+      "id": "crop-03",
+      "type": "blank",
+      "stage": "결측치",
+      "title": "결측치를 평균으로 채우기",
+      "prompt": "`mean_temp`(평균 기온)와 `sun_hours`(일조 시간)에 빈칸이 있습니다. 두 컬럼 모두 **자신의 평균값**으로 채우세요.",
+      "code": "farm_df['mean_temp'] = farm_df['mean_temp'].⟦fillna⟧(farm_df['mean_temp'].mean())\nfarm_df['sun_hours'] = farm_df['sun_hours'].fillna(farm_df['sun_hours'].⟦mean⟧())",
+      "blanks": [
+        {"options": ["dropna", "replace", "interpolate"]},
+        {"options": ["median", "mode", "max"]}
+      ],
+      "check": [
+        "int(farm_df[['mean_temp', 'sun_hours']].isna().sum().sum()) == 0",
+        "round(farm_df['mean_temp'].mean(), 2) == 17.74",
+        "round(farm_df['sun_hours'].mean(), 2) == 2258.33"
+      ],
+      "hint": "비어 있는 칸을 어떤 값으로 채우는 메소드인지 생각해 보세요.",
+      "explain": "`fillna(값)` 은 비어 있는 칸을 그 값으로 채웁니다. 채우는 값으로 **그 컬럼 자신의 평균**(`mean()`)을 쓰면, 빈칸을 채운 뒤에도 전체 평균은 그대로 유지되면서 결측치만 사라집니다. `dropna` 는 행 자체를 지우는 것이라 다른 컬럼의 멀쩡한 값까지 함께 잃습니다."
+    },
+    {
+      "id": "crop-04",
+      "type": "choice",
+      "stage": "시각화",
+      "title": "흙 종류에 따라 수확량이 다를까",
+      "prompt": "흙 종류(`soil_kind`)별로 평균 수확량을 구해 층이 있는지 확인하세요.",
+      "code": "farm_df.groupby('soil_kind')['output_kg_per_ha'].mean().round(1).sort_values(ascending=False)",
+      "choices": [
+        "점토 > 사질토 > 양토 순으로 높다",
+        "양토 > 사질토 > 점토 순으로 높다",
+        "세 흙의 평균이 거의 같다",
+        "사질토가 가장 높고 점토가 가장 낮다"
+      ],
+      "answer": 1,
+      "check": [
+        "farm_df.groupby('soil_kind')['output_kg_per_ha'].mean().round(1).sort_values(ascending=False).index.tolist() == ['양토', '사질토', '점토']",
+        "round(farm_df.groupby('soil_kind')['output_kg_per_ha'].mean()['양토'], 1) == 2321.9",
+        "round(farm_df.groupby('soil_kind')['output_kg_per_ha'].mean()['점토'], 1) == 1982.7"
+      ],
+      "hint": "`groupby()` 뒤에 평균 낼 컬럼을 대괄호로 골라 `mean()` 을 붙입니다.",
+      "explain": "양토(2321.9kg) · 사질토(2173.3kg) · 점토(1982.7kg) 순서로 뚜렷한 층이 보입니다. 340kg 가까이 차이가 나므로, `soil_kind` 는 숫자가 아닌 범주형 변수이지만 수확량을 가르는 데 도움이 됩니다. 다만 모델에 넣으려면 이 글자 값을 숫자로 바꾸는 인코딩이 먼저 필요합니다.",
+      "lab": {"tab": "explore", "say": "데이터 탐험실의 groupby 집계기에서 흙 종류 대신 fertilizer(비료)를 골라도 층이 보이는지 비교해 보자."}
+    },
+    {
+      "id": "crop-05",
+      "type": "blank",
+      "stage": "파생변수",
+      "title": "질소 ÷ 칼리 비율 만들기",
+      "prompt": "질소(`n_level`)와 칼리(`k_level`)를 하나로 합친 새 변수 `nk_ratio`(질소 ÷ 칼리 비율)를 만드세요.",
+      "code": "farm_df['nk_ratio'] = farm_df['n_level'] ⟦/⟧ farm_df['⟦k_level⟧']",
+      "blanks": [
+        {"options": ["*", "+", "-"]},
+        {"options": ["p_level", "rain_mm_year"]}
+      ],
+      "check": [
+        "'nk_ratio' in farm_df.columns",
+        "(farm_df['nk_ratio'] - farm_df['n_level'] / farm_df['k_level']).abs().max() < 1e-9"
+      ],
+      "hint": "「질소 ÷ 칼리」이므로 나누기 기호와 분모에 들어갈 컬럼을 생각해 보세요.",
+      "explain": "두 컬럼을 나눗셈으로 합치면 `nk_ratio` 는 「질소가 칼리보다 몇 배 많은가」를 나타내는 새 변수가 됩니다. 이렇게 기존 컬럼을 조합해 만든 변수를 **파생변수**라고 합니다. 다음 문제에서 이 파생변수가 실제로 수확량 예측에 도움이 되는지 확인합니다."
+    },
+    {
+      "id": "crop-06",
+      "type": "choice",
+      "stage": "파생변수",
+      "title": "파생변수가 실제로 도움이 될까",
+      "prompt": "방금 만든 `nk_ratio` 가 수확량과 얼마나 관련 있는지 상관계수로 확인하세요.",
+      "code": "round(farm_df['nk_ratio'].corr(farm_df['output_kg_per_ha']), 2)",
+      "choices": [
+        "0.75 로 강한 상관이 생겨 새 변수가 유용하다",
+        "-0.62 로 강한 음의 상관이 생긴다",
+        "정확히 1.00 이 되어 목표와 같은 값이다",
+        "0.04 로 거의 상관이 없어 이 형태로는 도움이 안 된다"
+      ],
+      "answer": 3,
+      "check": ["round(farm_df['nk_ratio'].corr(farm_df['output_kg_per_ha']), 2) == 0.04"],
+      "explain": "비율로 묶어도 상관계수는 0.04 로, 재료로 쓴 `n_level`·`k_level` 이 애초에 수확량과 무관했던 성질이 그대로 이어집니다. 파생변수를 **만들었다는 사실 자체가 도움을 보장하지 않으며**, 만든 뒤에도 원래 변수들처럼 관계를 다시 확인해야 한다는 것이 이 문제의 핵심입니다."
+    },
+    {
+      "id": "crop-07",
+      "type": "blank",
+      "stage": "인코딩",
+      "title": "흙 종류·비료를 숫자로",
+      "prompt": "모델에 넣기 전에 범주형 컬럼 `soil_kind`(흙 종류)와 `fertilizer`(비료)를 원-핫 인코딩해 `farm_pre` 를 만드세요.",
+      "code": "farm_pre = pd.⟦get_dummies⟧(farm_df, ⟦columns⟧=['soil_kind', 'fertilizer'], dtype=int)",
+      "blanks": [
+        {"options": ["factorize", "cut", "melt"]},
+        {"options": ["index", "subset", "values"]}
+      ],
+      "check": [
+        "farm_pre.shape[0] == 870",
+        "int(farm_pre.isna().sum().sum()) == 0",
+        "'soil_kind_양토' in farm_pre.columns and 'fertilizer_복합' in farm_pre.columns",
+        "'soil_kind' not in farm_pre.columns and 'fertilizer' not in farm_pre.columns"
+      ],
+      "hint": "순서 없는 범주형 컬럼을 0/1 컬럼 여러 개로 펼치는 함수입니다.",
+      "explain": "`get_dummies()` 의 `columns` 인자에 바꿀 컬럼을 적으면, 그 컬럼마다 값의 종류 수만큼 0/1 컬럼이 새로 생깁니다. 흙 종류 3가지·비료 4가지가 컬럼 7개로 펼쳐지고, 원래의 글자 컬럼은 사라집니다. `dtype=int` 를 적어 두면 0/1이 `True`/`False` 대신 숫자로 저장됩니다."
+    },
+    {
+      "id": "crop-08",
+      "type": "bug",
+      "stage": "모델 학습",
+      "title": "학습이 안 되는 이유",
+      "prompt": "특성 중요도를 보려고 랜덤 포레스트를 학습시켰는데 오류가 납니다. 방금 만든 `farm_pre` 를 써야 하는데 잘못된 변수를 넣었습니다. 잘못된 줄을 찾으세요.",
+      "code": "X = farm_df.drop(columns=['output_kg_per_ha'])\ny = farm_df['output_kg_per_ha']\nfrom sklearn.ensemble import RandomForestRegressor\nmodel = RandomForestRegressor(random_state=6, n_estimators=200)\nmodel.fit(X, y)\nprint(round(model.score(X, y), 2))",
+      "answer": 1,
+      "fix": "X = farm_pre.drop(columns=['output_kg_per_ha'])",
+      "check": [
+        "'soil_kind' not in X.columns",
+        "'fertilizer' not in X.columns",
+        "round(model.score(X, y), 2) >= 0.9"
+      ],
+      "hint": "`farm_df` 에는 아직 글자로 된 범주형 컬럼이 그대로 남아 있습니다.",
+      "explain": "`farm_df` 에는 인코딩하지 않은 `soil_kind`·`fertilizer` 가 글자 그대로 남아 있어, 모델이 숫자로 바꿀 수 없다는 오류를 냅니다. 원-핫 인코딩을 마친 `farm_pre` 를 대신 넣어야 합니다. 전처리한 표를 만들어 놓고도 정작 학습에는 원본 표를 넣는 실수는 실제로 자주 일어나므로, 오류가 나면 X 안에 어떤 컬럼이 들어 있는지부터 확인하는 습관이 필요합니다."
+    },
+    {
+      "id": "crop-09",
+      "type": "choice",
+      "stage": "해석·예측",
+      "title": "모델이 가장 많이 참고한 변수",
+      "prompt": "학습이 끝난 모델의 `feature_importances_` 로 어떤 변수를 가장 많이 참고했는지 확인하세요.",
+      "code": "pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False).head(3)",
+      "choices": [
+        "fertilizer_복합, fertilizer_인산, fertilizer_칼리",
+        "n_level, p_level, k_level",
+        "mean_temp, soil_ph, nk_ratio",
+        "rain_mm_year, soil_kind_점토, sun_hours"
+      ],
+      "answer": 3,
+      "check": [
+        "pd.Series(model.feature_importances_, index=X.columns).sort_values(ascending=False).index[:3].tolist() == ['rain_mm_year', 'soil_kind_점토', 'sun_hours']"
+      ],
+      "explain": "중요도 1위는 상관계수에서도 가장 강했던 `rain_mm_year`(강수량)입니다. 2위가 `soil_kind_점토` 인 것은 눈여겨볼 만한데, 흙 종류 하나하나의 상관계수는 구할 수 없지만(글자 값이라서) 원-핫 컬럼으로 펼치고 나면 모델이 그 차이를 실제로 크게 활용한다는 뜻입니다. 반대로 상관계수가 0에 가까웠던 `n_level`·`p_level`·`k_level` 은 중요도 순위에서도 하위권에 머뭅니다. 상관계수와 특성 중요도가 대체로 같은 결론을 가리킨다는 것을 확인할 수 있습니다.",
+      "lab": {"tab": "train", "say": "모델 학습실에서 크롭 데이터로 랜덤 포레스트를 학습시켜 특성 중요도 막대그래프를 직접 보자."}
+    }
+  ]
+}

@@ -1,0 +1,166 @@
+{
+  "goal": "데이터 한 벌로 불러오기부터 평가까지 머신러닝을 처음으로 끝까지 한 바퀴 돌아 본다.",
+  "setup": "import pandas as pd\nexam_df = pd.read_csv('exam_result.csv')",
+  "problems": [
+    {
+      "id": "exam-01",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "표의 크기부터 확인하기",
+      "prompt": "데이터를 불러오면 가장 먼저 **몇 행 몇 열인지** 확인합니다. 아래 코드의 실행 결과로 알맞은 것을 고르세요.",
+      "code": "exam_df.shape",
+      "choices": ["(1150, 9)", "(9, 1150)", "(1150, 8)", "(1149, 9)"],
+      "answer": 0,
+      "check": ["exam_df.shape == (1150, 9)"],
+      "hint": "`shape` 는 (행, 열) 차례로 알려 줍니다.",
+      "explain": "`shape` 는 **(행 개수, 열 개수)** 를 돌려줍니다. 학생 한 명이 한 행이므로 학생 1150명의 기록이고, 열 9개에는 예측 목표인 `final_point` 도 들어 있습니다. 그래서 모델에 넣을 입력 변수는 8개입니다. 괄호 안의 차례를 헷갈리면 뒤에서 행과 열을 거꾸로 다루게 되니 처음에 꼭 확인해 두세요."
+    },
+    {
+      "id": "exam-02",
+      "type": "blank",
+      "stage": "결측치",
+      "title": "빈칸이 몇 개인지 세기",
+      "prompt": "컬럼마다 **비어 있는 값(결측치)** 이 몇 개인지 세어, 결측치가 있는 컬럼만 보여 주려고 합니다. 빈칸을 채우세요.",
+      "code": "missing = exam_df.⟦isna⟧().sum()\nprint(missing[missing ⟦>⟧ 0])",
+      "blanks": [
+        {"options": ["dropna", "fillna", "notna"]},
+        {"options": ["==", "<", "!="]}
+      ],
+      "check": ["int(missing['midterm_point']) == 45", "int(missing['club_join']) == 51", "int(missing.sum()) == 96"],
+      "explain": "`isna()` 는 칸마다 비었으면 `True`, 아니면 `False` 인 표를 만듭니다. 파이썬에서 `True` 는 1로 셈하므로 `sum()` 을 하면 컬럼마다 빈칸 개수가 됩니다. 그중 0보다 큰 것만 골라 보면 `midterm_point` 45개, `club_join` 51개가 비어 있습니다. `notna()` 는 반대로 「채워진 칸」을 셉니다.",
+      "lab": {"tab": "explore", "say": "데이터 탐험실의 info() 표에서 결측치 개수를 눈으로 확인해 보자."}
+    },
+    {
+      "id": "exam-03",
+      "type": "choice",
+      "stage": "결측치",
+      "title": "지우면 얼마나 잃을까",
+      "prompt": "결측치를 처리하는 가장 쉬운 방법은 빈칸이 하나라도 있는 행을 지우는 것입니다. 아래 코드를 실행하면 몇 행이 남을까요?",
+      "code": "len(exam_df.dropna())",
+      "choices": ["1150", "1105", "1099", "1058"],
+      "answer": 3,
+      "check": ["len(exam_df.dropna()) == 1058"],
+      "hint": "빈칸 45개와 51개가 서로 다른 학생에게 있을 수도, 같은 학생에게 겹칠 수도 있습니다.",
+      "explain": "결측치가 있는 행을 모두 지우면 1150행 가운데 **92행(약 8%)** 이 사라져 1058행이 남습니다. 45 + 51 = 96 보다 적은 것은 두 컬럼이 함께 빈 학생이 4명 있기 때문입니다. 지우기는 간단하지만, 멀쩡한 다른 컬럼 값까지 함께 버린다는 점을 기억하세요. 그래서 다음 문제에서는 지우지 않고 다른 방법을 씁니다."
+    },
+    {
+      "id": "exam-04",
+      "type": "choice",
+      "stage": "결측치",
+      "title": "그 컬럼, 꼭 살려야 할까",
+      "prompt": "`club_join`(동아리 활동 여부)은 결측치가 51개로 가장 많습니다. 채울 방법을 고민하기 전에, 이 컬럼이 기말 점수와 관계가 있는지부터 봅니다.\n\n아래 결과를 보고 가장 알맞은 판단을 고르세요.",
+      "code": "exam_df.groupby('club_join')['final_point'].mean().round(2)",
+      "choices": [
+        "동아리를 하는 학생이 점수가 훨씬 높으므로 결측치를 꼼꼼히 채워야 한다",
+        "두 무리의 평균이 거의 같아 예측에 도움이 적으므로 컬럼을 빼도 된다",
+        "결측치가 있는 컬럼은 무조건 빼야 한다",
+        "평균이 같으므로 결측치를 모두 '있음'으로 채우면 된다"
+      ],
+      "answer": 1,
+      "check": [
+        "abs(exam_df.groupby('club_join')['final_point'].mean().diff().iloc[-1]) < 1",
+        "round(exam_df.groupby('club_join')['final_point'].mean()['있음'], 2) == 52.55",
+        "round(exam_df.groupby('club_join')['final_point'].mean()['없음'], 2) == 53.13"
+      ],
+      "explain": "동아리를 하는 학생(52.55점)과 하지 않는 학생(53.13점)의 평균 차이가 0.6점도 안 됩니다. 이 컬럼으로는 점수를 가려낼 수 없다는 뜻이라, 51개를 애써 채우기보다 컬럼을 통째로 빼는 편이 낫습니다. 다만 ③처럼 「결측치가 있으면 무조건 뺀다」는 규칙은 틀렸습니다. `midterm_point` 도 결측치가 있지만 점수와 아주 강하게 이어져 있어 반드시 살려야 합니다. **빼기 전에 쓸모를 먼저 확인하는 것**이 핵심입니다.",
+      "lab": {"tab": "explore", "say": "데이터 탐험실의 groupby 집계기에서 club_join 과 extra_class 를 번갈아 골라 비교해 보자."}
+    },
+    {
+      "id": "exam-05",
+      "type": "blank",
+      "stage": "인코딩",
+      "title": "모델이 읽을 수 있는 숫자로",
+      "prompt": "모델은 글자를 읽지 못합니다. 아래 순서로 데이터를 손질하세요.\n\n* `club_join` 컬럼을 뺀다\n* `midterm_point` 의 빈칸을 **중앙값**으로 채운다\n* `extra_class` 의 `있음`/`없음` 을 1/0 으로 바꾼다\n* `track`(계열)은 원-핫 인코딩한다",
+      "code": "exam_pre = exam_df.drop(columns=['club_join'])\nmedian_mid = exam_pre['midterm_point'].⟦median⟧()\nexam_pre['midterm_point'] = exam_pre['midterm_point'].fillna(median_mid)\nexam_pre['extra_class'] = exam_pre['extra_class'].⟦map⟧({'있음': 1, '없음': 0})\nexam_pre = pd.get_dummies(exam_pre, columns=['track'], dtype=int)",
+      "blanks": [
+        {"options": ["mean", "mode", "max"]},
+        {"options": ["apply", "astype", "fillna"]}
+      ],
+      "check": [
+        "int(exam_pre.isna().sum().sum()) == 0",
+        "exam_pre.shape == (1150, 12)",
+        "median_mid == 52.3",
+        "sorted(exam_pre['extra_class'].unique().tolist()) == [0, 1]"
+      ],
+      "explain": "`median()` 은 값을 크기 순으로 세웠을 때 가운데 값(52.3점)입니다. 평균과 달리 유난히 높거나 낮은 점수에 덜 흔들립니다. `map()` 에 사전을 넣으면 `'있음'` 은 1, `'없음'` 은 0 으로 바꿉니다. 계열(`track`)처럼 순서가 없는 범주는 숫자 하나로 바꾸면 모델이 크고 작음이 있다고 오해하므로, `get_dummies()` 로 계열마다 0/1 컬럼을 따로 만듭니다. 계열 5개가 컬럼 5개가 되어 전체가 12열이 됩니다.",
+      "lab": {"tab": "prep", "say": "전처리 실험실에서 결측치를 평균·중앙값으로 채울 때 분포가 어떻게 달라지는지 비교해 보자."}
+    },
+    {
+      "id": "exam-06",
+      "type": "order",
+      "stage": "분리·스케일링",
+      "title": "학습과 평가의 차례",
+      "prompt": "손질한 데이터로 모델을 만들고 얼마나 잘 맞히는지 확인하려고 합니다. 아래 단계를 **올바른 차례**로 늘어놓으세요.",
+      "steps": [
+        "입력(X)과 정답(y)으로 나눈다",
+        "훈련 데이터와 검증 데이터로 나눈다",
+        "훈련 데이터로 모델을 학습시킨다",
+        "검증 데이터의 입력으로 예측한다",
+        "예측값과 검증 데이터의 정답을 비교해 점수를 낸다"
+      ],
+      "explain": "모델이 **본 적 없는 데이터**를 얼마나 맞히는지 알아야 실제로 쓸 수 있는지 판단할 수 있습니다. 그래서 학습하기 전에 일부(검증 데이터)를 떼어 숨겨 두고, 학습이 끝난 뒤에만 꺼내 씁니다. 검증 데이터를 학습에 섞으면 시험 문제를 미리 보고 시험을 치는 셈이 되어 점수가 부풀려집니다."
+    },
+    {
+      "id": "exam-07",
+      "type": "blank",
+      "stage": "모델 학습",
+      "title": "선형 회귀 학습시키기",
+      "prompt": "데이터를 훈련 80%, 검증 20% 로 나눈 뒤 선형 회귀 모델을 학습시키세요. 학습은 **훈련 데이터만** 써야 합니다.",
+      "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\n\nX = exam_pre.drop(columns=['final_point'])\ny = exam_pre['final_point']\nX_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.2, random_state=11)\n\nmodel = LinearRegression()\nmodel.⟦fit⟧(⟦X_train, y_train⟧)",
+      "blanks": [
+        {"options": ["predict", "transform", "score"]},
+        {"options": ["X_valid, y_valid", "X, y", "y_train, X_train"]}
+      ],
+      "check": ["len(X_train) == 920", "len(X_valid) == 230", "'final_point' not in X.columns"],
+      "explain": "`fit(입력, 정답)` 이 학습입니다. 입력이 먼저, 정답이 나중이라는 차례를 지켜야 합니다. 1150행의 20% 인 230행이 검증용으로 빠지고 920행으로 학습합니다. `X, y` 를 통째로 넣으면 검증 데이터까지 학습에 섞여, 나중에 검증 점수를 믿을 수 없게 됩니다.",
+      "lab": {"tab": "train", "say": "모델 학습실에서 같은 데이터로 선형 회귀를 학습해 보자. 분리 비율을 바꾸면 점수가 어떻게 흔들리는지도 보자."}
+    },
+    {
+      "id": "exam-08",
+      "type": "bug",
+      "stage": "평가",
+      "title": "점수가 너무 좋을 때",
+      "prompt": "친구가 만든 모델의 검증 R² 가 **1.0**(만점)이 나왔습니다. 실제 데이터에서 이런 점수는 거의 나오지 않으므로 먼저 의심해야 합니다. 잘못된 줄을 찾으세요.",
+      "code": "X_bad = exam_pre.drop(columns=['midterm_point'])\ny_bad = exam_pre['final_point']\nXa, Xb, ya, yb = train_test_split(X_bad, y_bad, test_size=0.2, random_state=11)\nbad_model = LinearRegression().fit(Xa, ya)\nprint(round(bad_model.score(Xb, yb), 3))",
+      "answer": 1,
+      "fix": "X_bad = exam_pre.drop(columns=['final_point'])",
+      "sandbox": true,
+      "check": ["bad_model.score(Xb, yb) < 0.9", "'final_point' not in X_bad.columns"],
+      "hint": "X 안에 들어 있으면 안 되는 컬럼이 하나 있습니다.",
+      "explain": "1번 줄에서 정답 컬럼 `final_point` 대신 `midterm_point` 를 뺐습니다. 그래서 입력 X 안에 **정답이 그대로 들어가**, 모델은 정답 컬럼을 베끼기만 하면 만점을 받습니다. 이렇게 정답(또는 정답을 미리 알려 주는 정보)이 입력에 새어 들어가는 것을 **데이터 누수**라고 합니다. 점수가 믿기 어려울 만큼 좋으면 먼저 X 에 무엇이 들어 있는지 확인하세요."
+    },
+    {
+      "id": "exam-09",
+      "type": "choice",
+      "stage": "평가",
+      "title": "MAE 가 말해 주는 것",
+      "prompt": "7번 문제에서 학습한 모델로 검증 데이터를 예측하고 평균 절대 오차(MAE)를 구했습니다. 결과를 바르게 해석한 것을 고르세요.",
+      "code": "from sklearn.metrics import mean_absolute_error\npred = model.predict(X_valid)\nprint(round(mean_absolute_error(y_valid, pred), 2))",
+      "choices": [
+        "예측이 실제 기말 점수와 평균 6.7% 어긋난다",
+        "예측이 실제 기말 점수와 평균 6.7점쯤 어긋난다",
+        "230명 가운데 6.7명을 틀리게 예측했다",
+        "예측 점수가 실제보다 늘 6.7점 높다"
+      ],
+      "answer": 1,
+      "check": ["round(mean_absolute_error(y_valid, pred), 2) == 6.7"],
+      "explain": "MAE 는 (예측 − 실제)의 **크기**를 학생마다 구해 평균 낸 값이라, 단위가 목표와 같은 「점」입니다. 그래서 「평균 6.7점쯤 어긋난다」로 읽습니다. 크기만 보므로 높게 빗나갔는지 낮게 빗나갔는지는 알려 주지 않습니다(④가 틀린 까닭). 맞힌 개수를 세는 것은 분류에서 쓰는 정확도이고, 회귀에서는 쓰지 않습니다(③).",
+      "lab": {"tab": "train", "say": "모델 학습실에서 훈련 점수와 검증 점수를 나란히 보고, 둘의 차이가 작은지 확인해 보자."}
+    },
+    {
+      "id": "exam-10",
+      "type": "blank",
+      "stage": "해석·예측",
+      "title": "새 학생의 점수 예측하기",
+      "prompt": "새 학생 한 명의 기록으로 기말 점수를 예측하려 합니다. 학습 때와 **같은 컬럼을 같은 차례로** 맞춰 넣어야 합니다. 빈칸을 채우세요.",
+      "code": "new = pd.DataFrame([{\n    'study_hours_week': 25, 'attend_percent': 90.0, 'extra_class': 1,\n    'midterm_point': 70.0, 'homework_avg': 85.0, 'online_lecture_count': 10,\n    'track_공학': 0, 'track_사회': 0, 'track_어문': 0, 'track_예술': 0, 'track_자연': 1,\n}])\nnew = new[X_train.⟦columns⟧]\nprint(round(model.⟦predict⟧(new)[0], 1))",
+      "blanks": [
+        {"options": ["index", "values", "shape"]},
+        {"options": ["fit", "score", "transform"]}
+      ],
+      "check": ["list(new.columns) == list(X_train.columns)", "60 < model.predict(new)[0] < 80"],
+      "explain": "모델은 학습 때 본 컬럼 이름과 차례를 그대로 기대합니다. `X_train.columns` 로 컬럼 목록을 꺼내 새 데이터를 그 차례대로 다시 세우면 빠진 컬럼이나 뒤바뀐 차례를 막을 수 있습니다. 새 데이터도 학습 때와 똑같이 손질해야 한다는 점이 중요합니다. 계열 `자연` 을 원-핫으로 `track_자연 = 1` 로 적은 것도 그 때문입니다. 예측은 `predict()` 가 합니다.",
+      "lab": {"tab": "train", "say": "모델 학습실 맨 아래 「예측 체험」에서 슬라이더로 새 학생을 만들어 예측해 보자."}
+    }
+  ]
+}

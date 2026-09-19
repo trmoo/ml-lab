@@ -1,0 +1,158 @@
+{
+  "goal": "살짝 불균형한 대출 심사 데이터로, 정확도만으로는 부족한 까닭과 정밀도·재현율을 배운다.",
+  "setup": "import pandas as pd\ncredit_df = pd.read_csv('loan_result.csv')",
+  "problems": [
+    {
+      "id": "loan-01",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "표의 크기부터 확인하기",
+      "prompt": "대출 신청 기록을 불러왔습니다. 아래 코드의 실행 결과로 알맞은 것을 고르세요.",
+      "code": "credit_df.shape",
+      "choices": ["(1720, 9)", "(1720, 10)", "(10, 1720)", "(1719, 10)"],
+      "answer": 1,
+      "check": ["credit_df.shape == (1720, 10)"],
+      "hint": "`shape` 는 (행, 열) 차례로 알려 줍니다.",
+      "explain": "대출 신청 1720건의 기록이 열 10개로 담겨 있습니다. 예측 목표는 심사 결과인 `approved`(1 승인 · 0 거절)이고, 나머지 9개가 입력 변수 후보입니다."
+    },
+    {
+      "id": "loan-02",
+      "type": "choice",
+      "stage": "살펴보기",
+      "title": "승인과 거절, 얼마씩 있을까",
+      "prompt": "예측 목표의 클래스 비율부터 확인합니다. 실행 결과로 가장 가까운 것을 고르세요.",
+      "code": "credit_df['approved'].value_counts(normalize=True).round(3)",
+      "choices": ["승인 50% · 거절 50%", "승인 9.2% · 거절 90.8%", "승인 90.8% · 거절 9.2%", "승인 99% · 거절 1%"],
+      "answer": 2,
+      "check": ["round(credit_df['approved'].value_counts(normalize=True)[1], 3) == 0.908"],
+      "hint": "제목처럼 「살짝 불균형」한 정도입니다 — 절반씩은 아니지만 한쪽이 압도적이지도 않습니다.",
+      "explain": "승인이 90.8%, 거절이 9.2% 입니다. 앞서 배운 이탈 예측(52.5% : 47.5%)보다 한쪽으로 많이 치우쳐 있습니다. 이 정도 비율에서는 '무조건 승인'이라고만 찍어도 정확도가 꽤 높게 나오기 때문에, 정확도 하나만 보고 모델을 판단하면 안 됩니다. 이 회차의 핵심 주제입니다."
+    },
+    {
+      "id": "loan-03",
+      "type": "blank",
+      "stage": "결측치",
+      "title": "빈 칸이 있는 행 정리하기",
+      "prompt": "아홉 개 입력 컬럼 모두에 결측치가 조금씩(47~68개) 있습니다. 하나라도 빈 칸이 있는 행을 지우세요.",
+      "code": "before_rows = len(credit_df)\ncredit_df = credit_df.⟦dropna⟧()\nafter_rows = len(credit_df)\nprint(after_rows)",
+      "blanks": [
+        {"options": ["drop_duplicates", "fillna", "isna"]}
+      ],
+      "check": ["before_rows == 1720", "after_rows == 1259"],
+      "hint": "빈 칸이 있는 행 자체를 지우는 메서드입니다.",
+      "explain": "`dropna()` 는 컬럼 어디든 결측치가 하나라도 있는 행을 지웁니다. 아홉 개 컬럼에 조금씩 겹치지 않게 빈 칸이 있어, 1720행 가운데 461행(약 27%)이 사라지고 1259행이 남습니다. 데이터가 넉넉하다면 이렇게 지우는 편이 채워 넣는 것보다 간단합니다.",
+      "lab": {"tab": "prep", "say": "전처리 실험실에서 결측치를 지울 때와 채울 때 남는 행 수·분포가 어떻게 달라지는지 비교해 보자."}
+    },
+    {
+      "id": "loan-04",
+      "type": "blank",
+      "stage": "인코딩",
+      "title": "순서가 있는 것과 없는 것",
+      "prompt": "`house_type`(자가·월세·전세)과 `past_overdue`(연체 없음·있음)는 순서가 있는 값으로 매핑하고, `job_type`·`loan_reason`은 원-핫 인코딩하세요.",
+      "code": "credit_df['house_type'] = credit_df['house_type'].map({'자가': 0, '월세': 1, '전세': 2})\ncredit_df['past_overdue'] = credit_df['past_overdue'].⟦map⟧({'없음': 0, '있음': 1})\ncredit_pre = pd.get_dummies(credit_df, columns=['job_type', 'loan_reason'], dtype=⟦int⟧)\nprint(credit_pre.shape)",
+      "blanks": [
+        {"options": ["astype", "apply", "fillna"]},
+        {"options": ["bool", "float", "str"]}
+      ],
+      "check": ["credit_pre.shape == (1259, 16)"],
+      "hint": "사전으로 값을 바꾸는 메서드는 앞에서 쓴 것과 같습니다. get_dummies 의 dtype 도 앞 회차와 같습니다.",
+      "explain": "연체 여부는 '없음 < 있음'처럼 순서로 볼 수 있어 `map()` 으로 0/1 숫자를 매깁니다. 직업 형태(4종류)·대출 목적(4종류)은 크고 작음이 없으므로 `get_dummies()` 로 각각 컬럼 4개씩을 만듭니다. 10개였던 컬럼에서 `job_type`·`loan_reason` 두 개가 빠지고 8개가 늘어 16개가 됩니다.",
+      "lab": {"tab": "prep", "say": "전처리 실험실의 인코딩 화면에서 순서형 매핑과 원-핫 인코딩의 결과 표를 비교해 보자."}
+    },
+    {
+      "id": "loan-05",
+      "type": "blank",
+      "stage": "분리·스케일링",
+      "title": "클래스 비율을 지키며 나누기",
+      "prompt": "승인이 훨씬 많으므로, 나눈 뒤에도 승인·거절 비율이 유지되도록 훈련·검증 데이터를 나누세요.",
+      "code": "from sklearn.model_selection import train_test_split\n\nX = credit_pre.drop(columns=['approved'])\ny = credit_pre['approved']\nX_train, X_valid, y_train, y_valid = train_test_split(\n    X, y, test_size=0.25, random_state=21, stratify=⟦y⟧)\nprint(len(X_train), len(X_valid))",
+      "blanks": [
+        {"options": ["X", "None", "approved"]}
+      ],
+      "check": ["len(X_train) == 944", "len(X_valid) == 315"],
+      "hint": "비율을 지키고 싶은 컬럼을 그대로 넣습니다.",
+      "explain": "`stratify=y` 로 나누면 거절(소수 클래스)이 훈련·검증 어느 한쪽에 몰리지 않고 양쪽에서 비슷한 비율로 나뉩니다. 거절 건수가 원래도 적은데(1259건 중 약 9%) 몰리기까지 하면 검증 데이터에 거절 사례가 거의 안 남을 수도 있어, 이런 데이터일수록 `stratify` 가 더 중요합니다."
+    },
+    {
+      "id": "loan-06",
+      "type": "choice",
+      "stage": "평가",
+      "title": "가장 단순한 기준선",
+      "prompt": "모델을 만들기 전에, 신청자 전부를 무조건 '승인'으로 찍는 가장 단순한 기준부터 확인합니다. 검증 데이터 `y_valid` 에서 이 기준의 정확도는 얼마일까요?",
+      "code": "(y_valid == 1).mean()",
+      "choices": ["약 91%", "약 50%", "약 86%", "약 99%"],
+      "answer": 0,
+      "check": ["round((y_valid == 1).mean(), 3) == 0.914"],
+      "hint": "검증 데이터에서 실제로 승인인 비율과 같습니다.",
+      "explain": "아무 모델도 없이 전부 승인이라고만 찍어도 정확도가 91.4% 나 나옵니다. 이 값이 바로 '기준선'입니다. 지금부터 만들 모델이 쓸모 있으려면 이 91.4% 보다 확실히 나아야 하고, 특히 소수 클래스인 거절을 얼마나 잘 잡아내는지도 함께 봐야 합니다."
+    },
+    {
+      "id": "loan-07",
+      "type": "blank",
+      "stage": "모델 학습",
+      "title": "결정 트리로 심사하기",
+      "prompt": "결정 트리 분류기를 훈련 데이터로 학습시키세요.",
+      "code": "from sklearn.tree import ⟦DecisionTreeClassifier⟧\n\ntree = DecisionTreeClassifier(max_depth=4, random_state=21)\ntree.⟦fit⟧(X_train, y_train)",
+      "blanks": [
+        {"options": ["DecisionTreeRegressor", "LogisticRegression", "RandomForestClassifier"]},
+        {"options": ["predict", "score", "transform"]}
+      ],
+      "check": ["hasattr(tree, 'tree_')"],
+      "hint": "승인/거절은 분류 문제이고, 회귀용 트리와 이름이 비슷하니 헷갈리지 않게 주의하세요.",
+      "explain": "`DecisionTreeRegressor` 는 숫자를 예측하는 회귀용이라 승인/거절 같은 범주를 맞히는 이 문제에는 쓸 수 없습니다. 학습은 여기서도 `fit(훈련 입력, 훈련 정답)` 입니다. 결정 트리는 조건을 따라가며 분류하므로, 신용 점수나 부채 비율 같은 기준이 왜 중요한지 나중에 특성 중요도로도 확인할 수 있습니다."
+    },
+    {
+      "id": "loan-08",
+      "type": "choice",
+      "stage": "평가",
+      "title": "정확도만 보면 안 되는 까닭",
+      "prompt": "결정 트리의 검증 정확도를 계산했더니 0.892 였습니다. 그런데 바로 앞 문제의 '전부 승인' 기준선은 0.914 였습니다. 이 상황을 가장 잘 설명한 것을 고르세요.",
+      "code": "from sklearn.metrics import accuracy_score\npred = tree.predict(X_valid)\ntree_acc = accuracy_score(y_valid, pred)\nprint(round(tree_acc, 3))",
+      "choices": [
+        "모델이 기준선보다 나으므로 잘 학습된 것이다",
+        "정확도만 보면 기준선보다 오히려 낮다 — 정확도 하나만으로는 이 모델이 쓸모 있는지 알 수 없다",
+        "코드에 오류가 있는 것이 분명하다",
+        "학습 데이터가 부족해서 생긴 우연이니 무시해도 된다"
+      ],
+      "answer": 1,
+      "check": ["round(tree_acc, 3) == 0.892", "tree_acc < (y_valid == 1).mean()"],
+      "hint": "숫자만 비교하면 모델이 '전부 승인'보다도 못합니다. 그렇다고 정말 쓸모없는 모델일까요, 아니면 정확도가 나쁜 잣대일까요?",
+      "explain": "결정 트리의 정확도(89.2%)는 아무 생각 없이 전부 승인이라 찍는 기준선(91.4%)보다도 낮습니다. 그렇다고 트리가 무조건 나쁜 모델은 아닙니다 — 승인 하나만 찍는 기준선은 거절을 단 하나도 잡아내지 못하는 반면, 트리는 거절도 몇 건은 잡아냅니다. 다만 이 사실은 정확도만 봐서는 전혀 드러나지 않습니다. 그래서 정밀도·재현율처럼 클래스별로 나눠 보는 지표가 필요합니다.",
+      "lab": {"tab": "train", "say": "모델 학습실에서 결정 트리의 훈련·검증 점수와 혼동 행렬을 함께 보며, 정확도만으로는 부족한 까닭을 확인해 보자."}
+    },
+    {
+      "id": "loan-09",
+      "type": "bug",
+      "stage": "평가",
+      "title": "재현율, 어느 클래스 기준일까",
+      "prompt": "위험한(거절해야 할) 신청자를 모델이 얼마나 잘 잡아내는지 재현율로 확인하려 합니다. 그런데 결과가 96.9% 로 너무 높게 나와 이상합니다. 잘못된 줄을 찾으세요.",
+      "code": "from sklearn.metrics import recall_score\npred = tree.predict(X_valid)\nrecall_risk = recall_score(y_valid, pred)\nprint(f'위험한 신청자를 얼마나 잡아내는가: {round(recall_risk, 3)}')",
+      "answer": 3,
+      "fix": "recall_risk = recall_score(y_valid, pred, pos_label=0)",
+      "check": [
+        "round(recall_risk, 3) == 0.074",
+        "round(recall_score(y_valid, pred), 3) == 0.969"
+      ],
+      "hint": "`recall_score` 는 별다른 지정이 없으면 1(승인)을 기준으로 계산합니다. 우리가 정말 궁금한 건 0(거절)을 얼마나 잡아내는가입니다.",
+      "explain": "`recall_score` 는 `pos_label` 을 따로 주지 않으면 기본값인 1(승인)을 기준으로 재현율을 계산합니다. 그래서 나온 96.9% 는 '승인해야 할 사람을 얼마나 잘 승인했는가'일 뿐, 우리가 알고 싶은 '거절해야 할 위험한 사람을 얼마나 잘 걸러냈는가'가 아닙니다. `pos_label=0` 을 주면 진짜 값인 7.4% 가 나옵니다 — 위험한 신청자 대부분을 놓치고 있다는 뜻입니다. 관심 있는 클래스를 분명히 밝히지 않으면 지표를 완전히 반대로 읽을 수 있습니다."
+    },
+    {
+      "id": "loan-10",
+      "type": "choice",
+      "stage": "평가",
+      "title": "어느 실수가 더 위험할까",
+      "prompt": "검증 데이터 315명의 혼동 행렬을 보면, 실제로는 거절해야 할 위험한 신청자인데 모델이 '승인'으로 잘못 예측한 사람이 25명, 실제로는 승인해도 될 안전한 신청자인데 '거절'로 잘못 예측한 사람이 9명입니다. 은행 입장에서 어느 쪽 실수가 더 위험할지 가장 알맞게 설명한 것을 고르세요.",
+      "code": "from sklearn.metrics import confusion_matrix\nprint(confusion_matrix(y_valid, pred))",
+      "choices": [
+        "두 실수 모두 똑같이 위험하므로 차이를 둘 필요가 없다",
+        "안전한 신청자를 거절한 9건이 더 위험하다 — 고객을 잃으면 손해다",
+        "정확도가 89.2%로 높으므로 두 실수 모두 무시해도 된다",
+        "위험한 신청자에게 돈을 빌려준 25건이 더 위험하다 — 대출금을 떼일 수 있지만, 안전한 신청자를 거절한 9건은 기회를 놓친 손해에 그친다"
+      ],
+      "answer": 3,
+      "check": ["confusion_matrix(y_valid, pred)[0][1] == 25", "confusion_matrix(y_valid, pred)[1][0] == 9"],
+      "hint": "돈을 빌려주고 못 돌려받는 손해와, 빌려줄 수 있었던 기회를 놓치는 손해를 비교해 보세요.",
+      "explain": "위험한 신청자에게 돈을 빌려주면 원금을 통째로 떼일 수 있어 손해가 큽니다. 반대로 안전한 신청자를 거절하면 그 사람에게 벌 수 있었던 이자만큼만 손해를 봅니다. 그래서 은행은 보통 거절해야 할 사람을 놓치는 실수(재현율이 낮은 것)를 더 두려워합니다. 이것이 바로 '정확도만으로는 부족하다'는 이 회차의 결론입니다."
+    }
+  ]
+}

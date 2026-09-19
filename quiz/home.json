@@ -1,0 +1,173 @@
+{
+  "goal": "두 표를 열쇠(home_id)로 합치고, 결측치가 있는 컬럼 7개를 컬럼 성질에 맞게 채운 뒤, 나무 깊이가 훈련·검증 점수를 어떻게 갈라놓는지 확인한다.",
+  "setup": "import pandas as pd\na = pd.read_csv('home_value_a.csv')\nb = pd.read_csv('home_value_b.csv')",
+  "problems": [
+    {
+      "id": "home-01",
+      "type": "blank",
+      "stage": "살펴보기",
+      "title": "두 표를 하나로 합치기",
+      "prompt": "이 회차는 파일이 두 개입니다. 집의 기본 정보(`a`)와 주변 환경 정보(`b`)가 같은 `home_id` 를 열쇠로 나뉘어 있습니다. 두 표를 `home_id` 를 기준으로 하나로 합치세요.",
+      "code": "home_df = a.⟦merge⟧(b, on=⟦'home_id'⟧)\nprint(home_df.shape)",
+      "blanks": [
+        {"options": ["concat", "join", "append"]},
+        {"options": ["'district'", "'deal_price_eok'", "'floor_area_sqm'"]}
+      ],
+      "check": [
+        "home_df.shape == (1440, 12)",
+        "list(home_df.columns).count('home_id') == 1"
+      ],
+      "hint": "`concat` 은 표를 위아래(또는 좌우)로 그냥 이어 붙일 뿐, 같은 집끼리 줄을 맞춰 주지는 않습니다.",
+      "explain": "`merge(on='home_id')` 는 두 표에서 **같은 home_id 를 가진 행끼리** 나란히 줄을 맞춰 하나로 합칩니다. `concat` 으로 이어 붙이면 두 표의 행 순서가 우연히 같을 때만 맞아떨어지고, 순서가 조금만 어긋나도 엉뚱한 집끼리 짝지어집니다. 합친 결과는 6열 + 7열에서 열쇠 `home_id` 가 겹치는 만큼 줄어 12열이 됩니다."
+    },
+    {
+      "id": "home-02",
+      "type": "choice",
+      "stage": "결측치",
+      "title": "결측치가 있는 컬럼은 몇 개",
+      "prompt": "합친 표에서 컬럼마다 결측치 개수를 세어 보세요. 결측치가 하나라도 있는 컬럼은 모두 몇 개인가요?",
+      "code": "missing = home_df.isna().sum()\nprint(missing[missing > 0])",
+      "choices": [
+        "7개 — 두 파일 각각 비어 있던 컬럼을 합친 개수다",
+        "4개",
+        "5개",
+        "6개"
+      ],
+      "answer": 0,
+      "check": [
+        "int((home_df.isna().sum() > 0).sum()) == 7",
+        "int(home_df.isna().sum().sum()) == 287"
+      ],
+      "explain": "두 파일을 따로 보면 `a`(집 기본 정보)에 4개, `b`(주변 환경 정보)에 3개, 합쳐서 7개 컬럼에 결측치가 있습니다. 파일을 나눠서 만든 데이터일수록 「어느 파일에 어떤 결측치가 있었는지」를 놓치기 쉬우므로, 합친 뒤 반드시 `isna().sum()` 으로 전체를 다시 확인해야 합니다."
+    },
+    {
+      "id": "home-03",
+      "type": "choice",
+      "stage": "결측치",
+      "title": "결측치가 있는 행을 지우면",
+      "prompt": "결측치가 있는 행을 전부 지우면 몇 행이 남을까요?",
+      "code": "kept = len(home_df.dropna())\nprint(kept, round((1440 - kept) / 1440 * 100, 1))",
+      "choices": [
+        "1058행 정도 사라진다",
+        "1177행 (약 18% 사라짐)",
+        "1440행 그대로 (사라지는 행 없음)",
+        "720행 (절반 사라짐)"
+      ],
+      "answer": 1,
+      "check": [
+        "kept == 1177",
+        "round((1440 - kept) / 1440 * 100, 1) == 18.3"
+      ],
+      "hint": "컬럼 하나하나의 결측치 비율은 2~4% 밖에 안 됩니다. 그런데 컬럼이 7개나 됩니다.",
+      "explain": "컬럼마다 결측치 비율은 2~4% 로 그리 높지 않지만, `dropna()` 는 **7개 컬럼 중 하나라도** 비어 있으면 그 행 전체를 지웁니다. 그래서 낱개로는 작은 비율들이 쌓여 전체 행의 약 18%(263행)가 사라집니다. 결측치가 있는 컬럼이 많을수록 「지우기」의 손실이 눈덩이처럼 커진다는 것을 보여 줍니다. 다음 문제부터는 지우지 않고 채우는 방법을 씁니다."
+    },
+    {
+      "id": "home-04",
+      "type": "blank",
+      "stage": "결측치",
+      "title": "숫자는 중앙값, 범주는 최빈값",
+      "prompt": "결측치가 있는 컬럼 7개 가운데, 숫자 컬럼(`room_count`·`bath_count`·`built_years`·`parking_slots`·`subway_within_1km`)은 **중앙값**으로, 범주형 컬럼(`district`·`frame_material`)은 **가장 많이 나온 값(최빈값)**으로 채우세요.",
+      "code": "home_pre = home_df.copy()\nnum_cols = ['room_count', 'bath_count', 'built_years', 'parking_slots', 'subway_within_1km']\nfor col in num_cols:\n    home_pre[col] = home_pre[col].⟦fillna⟧(home_pre[col].median())\ncat_cols = ['district', 'frame_material']\nfor col in cat_cols:\n    home_pre[col] = home_pre[col].fillna(home_pre[col].⟦mode⟧()[0])",
+      "blanks": [
+        {"options": ["dropna", "interpolate", "bfill"]},
+        {"options": ["mean", "median", "max"]}
+      ],
+      "check": [
+        "int(home_pre.isna().sum().sum()) == 0",
+        "home_pre.shape == (1440, 12)"
+      ],
+      "hint": "글자로 된 컬럼은 평균을 낼 수 없습니다.",
+      "explain": "숫자 컬럼은 중앙값처럼 「대표로 삼을 만한 숫자」가 있지만, `district`(구 이름)나 `frame_material`(구조)처럼 글자로 된 범주형 컬럼은 평균을 낼 수 없습니다. 그래서 범주형 컬럼은 **가장 흔한 값(최빈값)** 으로 채웁니다. `mode()` 는 값마다 몇 번 나왔는지 세어 그중 가장 많이 나온 값들을 돌려주므로, 동점을 대비해 `[0]` 으로 첫 번째 값을 꺼냅니다."
+    },
+    {
+      "id": "home-05",
+      "type": "choice",
+      "stage": "시각화",
+      "title": "붙어 다니는 면적과 방 개수",
+      "prompt": "`floor_area_sqm`(전용 면적)·`room_count`(방 개수)·`bath_count`(욕실 개수) 세 변수의 상관계수를 구했습니다. 알맞게 해석한 것을 고르세요.",
+      "code": "corr3 = home_pre[['floor_area_sqm', 'room_count', 'bath_count']].corr()\nprint(corr3.round(2))",
+      "choices": [
+        "세 변수는 서로 거의 무관하다",
+        "bath_count 와 room_count 는 전혀 관계가 없다",
+        "floor_area_sqm 과 room_count 가 가장 강하게 붙어 있다(|r|≈0.92) — 둘 다 그대로 넣으면 회귀 계수가 흔들릴 수 있다",
+        "floor_area_sqm 과 built_years 가 가장 강하게 붙어 있다"
+      ],
+      "answer": 2,
+      "check": ["round(corr3.loc['floor_area_sqm', 'room_count'], 2) == 0.92"],
+      "explain": "전용 면적이 넓을수록 방 개수도 거의 그대로 늘어나도록 데이터가 설계되어 있어(|r|≈0.92), 두 변수는 사실상 비슷한 정보를 담고 있습니다. 이런 짝을 그대로 선형 회귀에 함께 넣으면 어느 변수가 값을 끌어올리는지 계수가 갈라 갖기 어려워 흔들립니다. 트리 기반 모델은 한 번에 한 변수만 기준으로 나누기 때문에 이런 흔들림에 상대적으로 덜 취약합니다."
+    },
+    {
+      "id": "home-06",
+      "type": "bug",
+      "stage": "분리·스케일링",
+      "title": "번호표까지 입력에 넣었다",
+      "prompt": "범주형 컬럼을 원-핫 인코딩하고 훈련·검증으로 나누려 합니다. 아래 코드에는 입력(X)에 넣으면 안 되는 컬럼이 그대로 남아 있습니다. 잘못된 줄을 찾으세요.",
+      "code": "from sklearn.model_selection import train_test_split\nhome_ready = pd.get_dummies(home_pre, columns=['district', 'frame_material'], dtype=int)\nX = home_ready.drop(columns=['deal_price_eok'])\ny = home_ready['deal_price_eok']\nX_train, X_valid, y_train, y_valid = train_test_split(X, y, test_size=0.25, random_state=5)",
+      "answer": 3,
+      "fix": "X = home_ready.drop(columns=['home_id', 'deal_price_eok'])",
+      "check": [
+        "'home_id' not in X.columns",
+        "'deal_price_eok' not in X.columns",
+        "len(X_train) == 1080",
+        "len(X_valid) == 360",
+        "home_ready.shape == (1440, 18)"
+      ],
+      "hint": "home_id 는 그저 집에 매긴 번호일 뿐, 거래가와는 아무 관계가 없습니다.",
+      "explain": "3번 줄은 예측 목표(`deal_price_eok`)만 빼고, 그냥 집에 매긴 일련번호인 `home_id` 는 그대로 X 에 남겨 두었습니다. `home_id` 는 실제 주택 특성과 아무 관계가 없는 숫자인데, 모델은 이것도 「입력 변수」로 받아들여 우연한 규칙을 만들어 낼 수 있습니다. 정답이 새는 데이터 누수와는 다르지만, 뜻 없는 번호를 입력에 남겨 두면 안 된다는 점은 같습니다 — 식별용 컬럼은 항상 X 에서 빼야 합니다."
+    },
+    {
+      "id": "home-07",
+      "type": "choice",
+      "stage": "모델 학습",
+      "title": "나무를 깊게 키우면",
+      "prompt": "깊이를 3으로 제한한 결정 트리와, 깊이를 제한하지 않은 결정 트리를 각각 학습시켜 훈련·검증 점수를 비교했습니다. 알맞게 해석한 것을 고르세요.",
+      "code": "from sklearn.tree import DecisionTreeRegressor\n\nshallow = DecisionTreeRegressor(max_depth=3, random_state=5).fit(X_train, y_train)\ndeep = DecisionTreeRegressor(max_depth=None, random_state=5).fit(X_train, y_train)\nprint('얕은 나무', round(shallow.score(X_train, y_train), 2), round(shallow.score(X_valid, y_valid), 2))\nprint('깊은 나무', round(deep.score(X_train, y_train), 2), round(deep.score(X_valid, y_valid), 2))",
+      "choices": [
+        "깊은 나무가 검증 점수도 확실히 더 높다",
+        "나무 깊이는 점수에 아무 영향을 주지 않는다",
+        "얕은 나무는 훈련 점수가 너무 낮아 아예 쓸모가 없다",
+        "깊은 나무는 훈련 점수가 1.0(완벽)까지 오르지만 검증 점수는 얕은 나무보다 나아지지 않는다 — 훈련 데이터를 통째로 외운 것이다"
+      ],
+      "answer": 3,
+      "check": [
+        "round(shallow.score(X_train, y_train), 2) == 0.63",
+        "round(shallow.score(X_valid, y_valid), 2) == 0.64",
+        "round(deep.score(X_train, y_train), 2) == 1.0",
+        "round(deep.score(X_valid, y_valid), 2) == 0.63"
+      ],
+      "explain": "얕은 나무는 훈련 0.63 · 검증 0.64 로 둘이 비슷하지만, 깊은 나무는 훈련 1.0(모든 훈련 행을 완벽히 맞힘) · 검증 0.63 으로 격차가 크게 벌어집니다. 훈련 데이터를 「이해」한 것이 아니라 훈련 데이터의 세세한 값까지 잎 노드 하나하나에 통째로 외워 버린 것이라, 처음 보는 검증 데이터에서는 전혀 도움이 되지 않습니다. 나무 깊이는 `max_depth` 로 제한하거나, 뒤에 배울 랜덤 포레스트처럼 나무를 여럿 평균 내는 방법으로 다스릴 수 있습니다.",
+      "lab": {"tab": "train", "say": "모델 학습실에서 7회차 데이터로 결정 트리 깊이를 3 → 15 로 올리며 훈련·검증 점수가 어떻게 벌어지는지 확인해 보자."}
+    },
+    {
+      "id": "home-08",
+      "type": "blank",
+      "stage": "딥러닝",
+      "title": "신경망으로 거래가 예측하기",
+      "prompt": "이번에는 다층 신경망(MLP)으로 거래가를 예측하려 합니다. 회귀이므로 출력층은 값을 하나만 내보내고, 그 값에 어떤 함수도 씌우지 않아야 합니다. 빈칸을 채우세요.",
+      "code": "from tensorflow import keras\n\nmlp = keras.Sequential([\n    keras.layers.Dense(32, activation='relu', input_shape=(X_train.shape[1],)),\n    keras.layers.Dense(16, activation='relu'),\n    keras.layers.Dense(⟦1⟧, activation=⟦None⟧),\n])\nmlp.compile(optimizer='adam', loss=⟦'mse'⟧)",
+      "blanks": [
+        {"options": ["3", "10", "16"]},
+        {"options": ["'relu'", "'sigmoid'", "'softmax'"]},
+        {"options": ["'categorical_crossentropy'", "'binary_crossentropy'", "'accuracy'"]}
+      ],
+      "run": false,
+      "hint": "예측할 값(거래가)은 딱 하나이고, 음수도 큰 값도 될 수 있는 실수입니다.",
+      "explain": "회귀의 출력층은 예측값이 하나이므로 노드 수를 1로 둡니다. `sigmoid`·`softmax` 는 값을 0~1 사이 확률로 눌러 담는 함수라 분류에는 맞지만, 거래가처럼 범위가 정해지지 않은 실수를 예측할 때는 아무 함수도 씌우지 않아야(`activation=None`) 모델이 원하는 크기의 값을 그대로 내놓을 수 있습니다. 손실 함수도 분류에서 쓰는 교차 엔트로피가 아니라, 예측값과 실제값의 차이를 제곱해 평균 내는 `'mse'`(평균 제곱 오차)를 씁니다."
+    },
+    {
+      "id": "home-09",
+      "type": "order",
+      "stage": "결측치",
+      "title": "결측이 많은 데이터를 다루는 차례",
+      "prompt": "두 파일로 나뉘어 있고 결측치도 많은 이번 데이터를, 모델을 학습시키기 전까지 손질하는 순서를 올바르게 늘어놓으세요.",
+      "steps": [
+        "두 파일을 열쇠(home_id)로 합친다",
+        "컬럼마다 결측치 개수를 센다",
+        "숫자 컬럼은 중앙값으로, 범주형 컬럼은 최빈값으로 채운다",
+        "범주형 컬럼을 원-핫 인코딩한다",
+        "훈련·검증 데이터로 나눈다"
+      ],
+      "explain": "합치기 전에는 결측치를 컬럼별로 제대로 셀 수 없고, 결측치를 채우기 전에 인코딩부터 하면 새로 생긴 원-핫 컬럼에도 빈칸이 섞여 들어갑니다. 그리고 훈련·검증을 나누기 전에 전체 데이터로 결측치를 채우면 검증 데이터의 정보가 훈련 과정에 살짝 섞여 들어가므로, 엄밀하게는 나눈 뒤 훈련 데이터의 중앙값·최빈값으로 검증 데이터까지 채우는 것이 더 안전합니다 — 이번 회차에서는 배우는 순서를 단순하게 하려고 합친 표 전체로 채웠다는 점을 기억해 두세요."
+    }
+  ]
+}

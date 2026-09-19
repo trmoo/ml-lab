@@ -1,0 +1,25 @@
+{
+  "name": "ml-lab",
+  "private": true,
+  "version": "1.0.0",
+  "license": "UNLICENSED",
+  "author": "티쳐무",
+  "description": "머신러닝 실험실 — 파이썬 설치 없이 브라우저에서 머신러닝을 실제로 학습시켜 보는 수업용 웹앱",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite --open",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node test/lib.test.mjs && node test/quiz.test.mjs",
+    "test:lib": "node test/lib.test.mjs",
+    "test:quiz": "node test/quiz.test.mjs",
+    "verify": "python tools/verify_quiz.py",
+    "sweep": "node test/sweep.mjs",
+    "data": "python tools/make_data.py"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10",
+    "vite-plugin-singlefile": "^2.0.3"
+  }
+}
