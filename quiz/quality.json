@@ -9,12 +9,24 @@
       "title": "불량 비율 확인하기",
       "prompt": "제품 불량 데이터를 불러왔습니다. 예측 목표 `is_defect`(1 불량 · 0 정상) 이 전체의 몇 %인지 확인하세요.",
       "code": "n_defect = qc_df['is_defect'].sum()\nn_total = len(qc_df)\nprint(n_defect, '/', n_total, '=', round(n_defect / n_total * 100, 2), '%')",
-      "choices": ["29 / 2880 = 1.01 %", "288 / 2880 = 10.0 %", "1440 / 2880 = 50.0 %", "29 / 2880 = 29.0 %"],
+      "choices": [
+        "29 / 2880 = 1.01 %",
+        "288 / 2880 = 10.0 %",
+        "1440 / 2880 = 50.0 %",
+        "29 / 2880 = 29.0 %"
+      ],
       "answer": 0,
-      "check": ["n_defect == 29", "n_total == 2880", "round(n_defect / n_total * 100, 2) == 1.01"],
+      "check": [
+        "n_defect == 29",
+        "n_total == 2880",
+        "round(n_defect / n_total * 100, 2) == 1.01"
+      ],
       "hint": "`sum()` 은 1 인 값의 개수를 더해 줍니다.",
       "explain": "1 이 불량이므로 `sum()` 을 하면 불량 건수(29건)가 나옵니다. 2880건 가운데 겨우 1.01% 라, 이 회차 내내 「정확도만으로는 판단할 수 없다」는 점을 계속 확인하게 됩니다. 이렇게 한쪽으로 심하게 치우친 데이터를 다룰 때는 정확도 대신 재현율·정밀도 같은 다른 잣대가 필요합니다.",
-      "lab": {"tab": "explore", "say": "데이터 탐험실에서 is_defect 의 개수 그래프를 그려 두 막대의 높이가 얼마나 다른지 눈으로 확인해 보자."}
+      "lab": {
+        "tab": "explore",
+        "say": "데이터 탐험실에서 is_defect 의 개수 그래프를 그려 두 막대의 높이가 얼마나 다른지 눈으로 확인해 보자."
+      }
     },
     {
       "id": "quality-02",
@@ -24,12 +36,31 @@
       "prompt": "컬럼마다 결측치가 몇 개인지 세어, 결측치가 있는 컬럼만 보여 주세요.",
       "code": "missing = qc_df.⟦isna⟧().sum()\nprint(missing[missing ⟦>⟧ 0])",
       "blanks": [
-        {"options": ["notna", "duplicated", "unique"]},
-        {"options": ["==", "<", "!="]}
+        {
+          "options": [
+            "notna",
+            "duplicated",
+            "unique"
+          ]
+        },
+        {
+          "options": [
+            "==",
+            "<",
+            "!="
+          ]
+        }
       ],
-      "check": ["int(missing['worker_years']) == 93", "int(missing['work_min']) == 81", "int(missing.sum()) == 174"],
+      "check": [
+        "int(missing['worker_years']) == 93",
+        "int(missing['work_min']) == 81",
+        "int(missing.sum()) == 174"
+      ],
       "explain": "`isna()` 는 칸마다 비었으면 `True` 인 표를 만들고, `sum()` 을 하면 컬럼마다 빈칸 개수가 됩니다. `worker_years`(작업자 경력) 93개, `work_min`(작업 시간) 81개가 비어 있습니다. 불량 신호가 이 두 컬럼에도 걸려 있으므로(경력이 짧을수록 위험이 오른다), 통째로 빼기보다 채워서 쓰는 편이 낫습니다.",
-      "lab": {"tab": "explore", "say": "데이터 탐험실의 info() 표에서 worker_years·work_min 의 결측치 개수를 확인해 보자."}
+      "lab": {
+        "tab": "explore",
+        "say": "데이터 탐험실의 info() 표에서 worker_years·work_min 의 결측치 개수를 확인해 보자."
+      }
     },
     {
       "id": "quality-03",
@@ -39,8 +70,20 @@
       "prompt": "모델이 쓸 수 있도록 데이터를 손질하세요.\n\n* `worker_years`, `work_min` 의 결측치를 **중앙값**으로 채운다\n* `work_shift`(근무조) 는 낮 0, 밤 1 로 바꾼다\n* `line_no`(설비)는 원-핫 인코딩한다",
       "code": "med_worker = qc_df['worker_years'].median()\nmed_min = qc_df['work_min'].median()\n\nqc_pre = qc_df.copy()\nqc_pre['worker_years'] = qc_pre['worker_years'].⟦fillna⟧(med_worker)\nqc_pre['work_min'] = qc_pre['work_min'].fillna(med_min)\nqc_pre['work_shift'] = qc_pre['work_shift'].⟦map⟧({'낮': 0, '밤': 1})\nqc_pre = pd.get_dummies(qc_pre, columns=['line_no'], dtype=int)",
       "blanks": [
-        {"options": ["dropna", "replace", "interpolate"]},
-        {"options": ["apply", "astype", "sort_values"]}
+        {
+          "options": [
+            "dropna",
+            "replace",
+            "interpolate"
+          ]
+        },
+        {
+          "options": [
+            "apply",
+            "astype",
+            "sort_values"
+          ]
+        }
       ],
       "check": [
         "int(qc_pre.isna().sum().sum()) == 0",
@@ -75,15 +118,26 @@
       "prompt": "X 와 y 를 훈련 80%, 검증 20% 로 나누세요. 불량이 29건뿐이라 검증 데이터에도 불량이 고르게 들어가도록 **`stratify`** 를 반드시 씁니다. 비교를 위해 `stratify` 없이 나눈 결과도 함께 봅니다.",
       "code": "from sklearn.model_selection import train_test_split\n\nX = qc_pre.drop(columns=['is_defect'])\ny = qc_pre['is_defect']\n\nX_train, X_valid, y_train, y_valid = train_test_split(\n    X, y, test_size=0.2, random_state=15, stratify=⟦y⟧)\n_, _, _, y_valid_no = train_test_split(X, y, test_size=0.2, random_state=15)\n\nprint('stratify=y  ->', y_valid.sum(), '건 / 576건')\nprint('stratify 없이 ->', y_valid_no.sum(), '건 / 576건')",
       "blanks": [
-        {"options": ["None", "X"]}
+        {
+          "options": [
+            "None",
+            "X"
+          ]
+        }
       ],
       "check": [
-        "len(X_train) == 2304", "len(X_valid) == 576",
-        "y_train.sum() == 23", "y_valid.sum() == 6",
-        "y_valid_no.sum() == 2", "len(y_valid_no) == 576"
+        "len(X_train) == 2304",
+        "len(X_valid) == 576",
+        "y_train.sum() == 23",
+        "y_valid.sum() == 6",
+        "y_valid_no.sum() == 2",
+        "len(y_valid_no) == 576"
       ],
       "explain": "`stratify=y` 는 원본의 불량 비율(1.01%)을 훈련·검증 데이터에도 그대로 지켜 줍니다. 그래서 검증 576건 가운데 불량이 6건(1.04%) 들어옵니다. 같은 `random_state` 인데도 `stratify` 를 빼면 검증 데이터에 불량이 **2건(0.35%)** 밖에 남지 않습니다 — 재현율 같은 지표가 겨우 몇 건으로 계산되어 운에 따라 크게 흔들리게 됩니다. 불량이 드문 데이터일수록 `stratify` 가 꼭 필요한 까닭입니다.",
-      "lab": {"tab": "prep", "say": "전처리 실험실의 훈련·검증 분리 시뮬레이터에서 target 을 quality 로 두고 나눠 보며 검증 데이터의 불량 개수가 어떻게 바뀌는지 보자."}
+      "lab": {
+        "tab": "prep",
+        "say": "전처리 실험실의 훈련·검증 분리 시뮬레이터에서 target 을 quality 로 두고 나눠 보며 검증 데이터의 불량 개수가 어떻게 바뀌는지 보자."
+      }
     },
     {
       "id": "quality-06",
@@ -99,21 +153,30 @@
         "검증 데이터를 잘못 나눠서 정확도가 낮게 나온 것이다"
       ],
       "answer": 1,
-      "check": ["round(accuracy_score(y_valid, dummy_pred), 4) == 0.9896", "int(dummy_pred.sum()) == 0"],
+      "check": [
+        "round(accuracy_score(y_valid, dummy_pred), 4) == 0.9896",
+        "int(dummy_pred.sum()) == 0"
+      ],
       "explain": "이 모델은 무엇을 넣든 '정상'만 찍는데도 정확도가 98.96% 나 됩니다. 검증 데이터 576건 중 불량이 6건(1.04%)뿐이라, 나머지 570건을 그냥 다 맞히기만 해도 정확도가 이렇게 높게 나오는 것입니다. 진짜로 궁금한 것은 「불량을 얼마나 찾아내는가」이고, 이 얼빠진 모델은 불량을 한 건도 찾지 못합니다(`dummy_pred.sum() == 0`). 그래서 불균형한 데이터에서는 정확도만 보면 안 됩니다.",
-      "lab": {"tab": "explore", "say": "데이터 탐험실에서 예측 목표 살펴보기를 열면 불균형 경고가 뜨는지 확인해 보자."}
+      "lab": {
+        "tab": "explore",
+        "say": "데이터 탐험실에서 예측 목표 살펴보기를 열면 불균형 경고가 뜨는지 확인해 보자."
+      }
     },
     {
       "id": "quality-07",
       "type": "bug",
       "stage": "평가",
       "title": "재현율, 어느 쪽을 봐야 할까",
-      "prompt": "친구가 로지스틱 회귀 모델을 학습시키고 '정확도 99%, 재현율도 100%라서 완벽하다'고 자랑합니다. 코드에서 잘못된 줄을 찾으세요.",
-      "code": "from sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, recall_score\nmodel = LogisticRegression(random_state=15, max_iter=3000).fit(X_train, y_train)\npred = model.predict(X_valid)\nacc = accuracy_score(y_valid, pred)\nrecall = recall_score(y_valid, pred, pos_label=0)\nprint(round(acc, 3), round(recall, 3))",
-      "answer": 6,
+      "prompt": "친구가 (표준화를 거친) 로지스틱 회귀 모델을 학습시키고 「정확도 99%, 재현율도 100%라서 완벽하다」고 자랑합니다. 코드에서 잘못된 줄을 찾으세요.",
+      "code": "from sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import accuracy_score, recall_score\nmodel = make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000)).fit(X_train, y_train)\npred = model.predict(X_valid)\nacc = accuracy_score(y_valid, pred)\nrecall = recall_score(y_valid, pred, pos_label=0)\nprint(round(acc, 3), round(recall, 3))",
+      "answer": 8,
       "fix": "recall = recall_score(y_valid, pred, pos_label=1)",
       "sandbox": true,
-      "check": ["round(acc, 3) == 0.99", "recall == 0.0"],
+      "check": [
+        "round(acc, 3) == 0.99",
+        "recall == 0.0"
+      ],
       "hint": "재현율은 「진짜 무엇」을 얼마나 잘 찾아내는지를 재는 값인지 생각해 보세요.",
       "explain": "`pos_label=0` 은 **정상**을 기준으로 재현율을 잰 것입니다. 거의 다 정상이라고 찍는 모델이니 정상은 100% 맞히는 게 당연하지만, 우리가 정말 알고 싶은 것은 **불량(1)** 을 얼마나 잘 잡아내느냐입니다. `pos_label=1` 로 바로잡아 다시 재면 재현율은 **0.0** — 이 모델은 불량을 단 한 건도 잡아내지 못합니다. 어느 클래스를 기준으로 재는지에 따라 같은 지표가 전혀 다른 뜻이 된다는 점을 기억하세요."
     },
@@ -122,21 +185,36 @@
       "type": "blank",
       "stage": "평가",
       "title": "임계값을 낮춰 불량 더 찾기",
-      "prompt": "기본 임계값(0.5)에서는 불량을 하나도 못 찾았습니다. `predict_proba` 로 불량일 확률을 구하고, 임계값을 **0.3** 으로 낮춰 다시 판정해 보세요.",
-      "code": "from sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import recall_score, precision_score\n\nmodel = LogisticRegression(random_state=15, max_iter=3000).fit(X_train, y_train)\nrecall_default = recall_score(y_valid, model.predict(X_valid), pos_label=1)\n\nproba = model.predict_proba(X_valid)[:, ⟦1⟧]\npred_03 = (proba >= ⟦0.3⟧).astype(int)\nrecall_03 = recall_score(y_valid, pred_03, pos_label=1)\nprecision_03 = precision_score(y_valid, pred_03, pos_label=1)\nprint(round(recall_default, 3), round(recall_03, 3), round(precision_03, 3), int(pred_03.sum()))",
+      "prompt": "기본 임계값(0.5)에서는 불량을 하나도 못 찾았습니다. `predict_proba` 로 불량일 확률을 구하고, 임계값을 **0.2** 로 낮춰 다시 판정해 보세요.",
+      "code": "from sklearn.pipeline import make_pipeline\nfrom sklearn.preprocessing import StandardScaler\nfrom sklearn.linear_model import LogisticRegression\nfrom sklearn.metrics import recall_score, precision_score\n\nmodel = make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000)).fit(X_train, y_train)\nrecall_default = recall_score(y_valid, model.predict(X_valid), pos_label=1)\n\nproba = model.predict_proba(X_valid)[:, ⟦1⟧]\npred_02 = (proba >= ⟦0.2⟧).astype(int)\nrecall_02 = recall_score(y_valid, pred_02, pos_label=1)\nprecision_02 = precision_score(y_valid, pred_02, pos_label=1)\nprint(round(recall_default, 3), round(recall_02, 3), round(precision_02, 3), int(pred_02.sum()))",
       "blanks": [
-        {"options": ["0", "-1"]},
-        {"options": ["0.5", "0.05", "1.0"]}
+        {
+          "options": [
+            "0",
+            "-1"
+          ]
+        },
+        {
+          "options": [
+            "0.5",
+            "0.05",
+            "1.0"
+          ]
+        }
       ],
       "check": [
         "round(recall_default, 3) == 0.0",
-        "round(recall_03, 3) == 0.5",
-        "round(precision_03, 3) == 0.429",
-        "int(pred_03.sum()) == 7"
+        "round(recall_02, 3) == 0.5",
+        "round(precision_02, 3) == 0.375",
+        "int(pred_02.sum()) == 8",
+        "float(abs(proba - 0.2).min()) > 0.01"
       ],
-      "explain": "`predict_proba(X_valid)[:, 1]` 은 **불량(1)일 확률**입니다(0번 열은 정상일 확률). 임계값을 0.5에서 0.3으로 낮추면 확률이 0.3만 넘어도 불량으로 판정하므로 더 많이 '불량'이라고 답하게 됩니다. 그 결과 재현율이 0에서 0.5로 올라 검증 데이터의 불량 6건 중 3건을 찾아내지만, 정상을 불량으로 잘못 판정하는 경우도 늘어 정밀도는 0.429(7번 불량이라고 한 것 중 3번만 진짜)로 낮습니다. 재현율을 올리면 정밀도가 낮아지는 **맞바꿈**이 임계값 조절의 핵심입니다.",
+      "explain": "`predict_proba(X_valid)[:, 1]` 은 **불량(1)일 확률**입니다(0번 열은 정상일 확률). 이 모델이 매긴 불량 확률은 가장 높은 것도 0.5 에 못 미쳐서, 기본 임계값으로는 하나도 불량이라 하지 않았습니다. 임계값을 0.2 로 낮추면 확률이 0.2 만 넘어도 불량으로 판정하므로 「불량」이라는 답이 늘어납니다. 그 결과 재현율이 0 에서 0.5 로 올라 검증 데이터의 불량 6건 중 3건을 찾아내지만, 정상을 불량으로 잘못 판정하는 경우도 생겨 정밀도는 0.375(불량이라고 한 8건 중 3건만 진짜)입니다. 재현율을 올리면 정밀도가 내려가는 **맞바꿈**이 임계값 조절의 핵심입니다.",
       "hint": "`predict_proba` 는 열이 두 개입니다 — 0번은 정상, 1번은 불량일 확률입니다.",
-      "lab": {"tab": "train", "say": "모델 학습실에서 분류 모델을 고르고 임계값 표를 내려, 임계값을 낮출 때 재현율과 정밀도가 어떻게 맞바뀌는지 확인해 보자."}
+      "lab": {
+        "tab": "train",
+        "say": "모델 학습실에서 분류 모델을 고르고 임계값 표를 내려, 임계값을 낮출 때 재현율과 정밀도가 어떻게 맞바뀌는지 확인해 보자."
+      }
     },
     {
       "id": "quality-09",
@@ -152,8 +230,10 @@
         "0.5보다 낮게 나왔으므로 이 모델은 전혀 쓸모없다는 뜻이다"
       ],
       "answer": 2,
-      "check": ["round(auc, 3) == 0.893", "round(auc, 2) == 0.89"],
-      "explain": "ROC-AUC 는 0.893 으로, 임계값 0.5 에서는 재현율이 0이었던 것과 달리 꽤 높게 나옵니다. 이 모델이 불량과 정상에 매기는 확률의 **순서**는 상당히 잘 갈라놓고 있지만(무작위로 뽑은 불량-정상 한 쌍 중 89.3%는 불량 쪽 확률이 더 높다), 불량 자체가 워낙 드물어서 확률값이 전반적으로 낮게 나와 기본 임계값 0.5로는 하나도 못 잡아낸 것입니다. 그래서 이런 데이터일수록 임계값을 낮춰 보는 8번 문제 같은 작업이 필요합니다.",
+      "check": [
+        "round(auc, 2) == 0.9"
+      ],
+      "explain": "ROC-AUC 는 약 0.90 으로, 임계값 0.5 에서는 재현율이 0이었던 것과 달리 꽤 높게 나옵니다. 이 모델이 불량과 정상에 매기는 확률의 **순서**는 상당히 잘 갈라놓고 있지만(무작위로 뽑은 불량-정상 한 쌍 가운데 약 90%는 불량 쪽 확률이 더 높다), 불량 자체가 워낙 드물어 확률값이 전반적으로 낮게 나오는 바람에 기본 임계값 0.5 로는 하나도 못 잡아낸 것입니다. 그래서 이런 데이터일수록 8번 문제처럼 임계값을 낮춰 보는 작업이 필요합니다.",
       "hint": "AUC 는 Area Under the ROC Curve, 즉 임계값을 처음부터 끝까지 다 바꿔 가며 본 성능입니다."
     },
     {
@@ -162,16 +242,21 @@
       "stage": "모델 학습",
       "title": "불균형을 다루는 또 다른 방법",
       "prompt": "임계값을 낮추는 것 말고, 학습 자체에서 불량에 더 무게를 두는 방법도 있습니다. `class_weight` 를 `'balanced'` 로 두고 다시 학습시켜 보세요.",
-      "code": "model_bal = LogisticRegression(random_state=15, max_iter=3000, class_weight=⟦'balanced'⟧).fit(X_train, y_train)\npred_bal = model_bal.predict(X_valid)\nprint(round(recall_score(y_valid, pred_bal, pos_label=1), 3),\n      round(precision_score(y_valid, pred_bal, pos_label=1), 3),\n      round(accuracy_score(y_valid, pred_bal), 3))",
+      "code": "model_bal = make_pipeline(StandardScaler(), LogisticRegression(max_iter=3000, class_weight=⟦'balanced'⟧)).fit(X_train, y_train)\npred_bal = model_bal.predict(X_valid)\nprint(round(recall_score(y_valid, pred_bal, pos_label=1), 3),\n      round(precision_score(y_valid, pred_bal, pos_label=1), 3),\n      round(accuracy_score(y_valid, pred_bal), 2))",
       "blanks": [
-        {"options": ["None", "'auto'"]}
+        {
+          "options": [
+            "None",
+            "'auto'"
+          ]
+        }
       ],
       "check": [
         "round(recall_score(y_valid, pred_bal, pos_label=1), 3) == 0.833",
         "round(precision_score(y_valid, pred_bal, pos_label=1), 3) == 0.056",
-        "round(accuracy_score(y_valid, pred_bal), 3) == 0.851"
+        "round(accuracy_score(y_valid, pred_bal), 2) == 0.85"
       ],
-      "explain": "`class_weight='balanced'` 은 데이터 개수가 적은 클래스(불량)의 실수에 더 큰 벌점을 매겨, 모델이 불량을 무시하지 못하게 만듭니다. 그 결과 재현율이 0(8번 문제)에서 **0.833**(6건 중 5건)까지 크게 오르지만, 정확도는 98.96% 에서 85.1% 로 내려가고 정밀도도 0.056 으로 낮아집니다(불량이라고 한 것 대부분이 사실은 정상). 임계값 낮추기와 마찬가지로 공짜가 아니라 **재현율을 사는 대신 정밀도·정확도를 내주는 것**입니다. 실제로 어느 쪽을 택할지는 불량을 놓쳤을 때와 정상을 불량으로 오판했을 때 중 무엇이 더 아픈지에 달려 있습니다.",
+      "explain": "`class_weight='balanced'` 은 데이터 개수가 적은 클래스(불량)의 실수에 더 큰 벌점을 매겨, 모델이 불량을 무시하지 못하게 만듭니다. 그 결과 재현율이 0(8번 문제)에서 **0.833**(6건 중 5건)까지 크게 오르지만, 정확도는 99% 에서 약 85% 로 내려가고 정밀도도 0.056 으로 낮아집니다(불량이라고 한 것 대부분이 사실은 정상). 임계값 낮추기와 마찬가지로 공짜가 아니라 **재현율을 사는 대신 정밀도·정확도를 내주는 것**입니다. 실제로 어느 쪽을 택할지는 불량을 놓쳤을 때와 정상을 불량으로 오판했을 때 중 무엇이 더 아픈지에 달려 있습니다.",
       "hint": "빈칸에는 「적은 쪽 클래스에 가중치를 맞춘다」는 뜻의 문자열이 들어갑니다."
     }
   ]
